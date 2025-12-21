@@ -68,7 +68,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-bold text-slate-800 leading-none">Admin Master</p>
-                <p className="text-[10px] text-slate-400 font-medium">LogiCheck Corp</p>
+                <p className="text-[10px] text-slate-400 font-medium">CheckShip Corp</p>
               </div>
               <div className="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                 AM
@@ -84,7 +84,7 @@ const App: React.FC = () => {
 
         {/* Global Action Footer */}
         <footer className="h-12 bg-white border-t border-slate-200 px-8 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">
-           <div>LogiCheck System v2.4.0</div>
+           <div>CheckShip System v2.4.0</div>
            <div className="flex gap-4">
               <a href="#" className="hover:text-blue-900 transition-colors">Termos de Uso</a>
               <a href="#" className="hover:text-blue-900 transition-colors">Privacidade</a>

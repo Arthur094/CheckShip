@@ -20,10 +20,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
       {/* Brand Logo Placeholder */}
       <div className="p-6 flex items-center gap-3">
         <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg">
-          LC
+          CS
         </div>
         <div>
-          <h1 className="font-bold text-slate-800 tracking-tight">LOGICHECK</h1>
+          <h1 className="font-bold text-slate-800 tracking-tight">CHECKSHIP</h1>
           <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">Fleet Management</p>
         </div>
       </div>
