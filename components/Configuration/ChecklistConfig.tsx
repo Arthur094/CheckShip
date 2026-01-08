@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import { 
-  ChevronDown, 
-  ChevronUp, 
-  Plus, 
-  Image as ImageIcon, 
-  X, 
-  Check, 
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Image as ImageIcon,
+  X,
+  Check,
   Info,
   Frown,
   Meh,
@@ -69,7 +69,7 @@ const Toggle: React.FC<{ label: string; description?: string; active?: boolean; 
         </div>
         {description && <p className="text-xs text-slate-400 mt-1">{description}</p>}
       </div>
-      <button 
+      <button
         onClick={() => setIsOn(!isOn)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isOn ? 'bg-blue-900' : 'bg-slate-300'}`}
       >
@@ -82,7 +82,7 @@ const Toggle: React.FC<{ label: string; description?: string; active?: boolean; 
 const TableToggle: React.FC<{ active?: boolean }> = ({ active = false }) => {
   const [isOn, setIsOn] = useState(active);
   return (
-    <button 
+    <button
       onClick={() => setIsOn(!isOn)}
       className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none ${isOn ? 'bg-blue-900' : 'bg-slate-300'}`}
     >
@@ -95,9 +95,9 @@ const SearchAndFilter: React.FC<{ placeholder: string }> = ({ placeholder }) => 
   <div className="flex items-center gap-4 mb-6">
     <div className="relative flex-1">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-      <input 
-        type="text" 
-        placeholder={placeholder} 
+      <input
+        type="text"
+        placeholder={placeholder}
         className="w-full bg-white border border-slate-200 rounded-xl px-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all"
       />
     </div>
@@ -110,7 +110,7 @@ const SearchAndFilter: React.FC<{ placeholder: string }> = ({ placeholder }) => 
 const ChecklistConfig: React.FC = () => {
   const [activeTab, setActiveTab] = useState('DADOS CADASTRAIS');
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({ geral: true });
-  
+
   // Structure states
   const [areas, setAreas] = useState<any[]>([]);
   const [isAddingArea, setIsAddingArea] = useState(false);
@@ -122,7 +122,7 @@ const ChecklistConfig: React.FC = () => {
     setOpenPanels(prev => ({ ...prev, [panel]: !prev[panel] }));
   };
 
-  const tabs = ['DADOS CADASTRAIS', 'ESTRUTURA', 'DEPARTAMENTOS', 'TIPOS DE UNIDADE', 'USUÁRIOS'];
+  const tabs = ['DADOS CADASTRAIS', 'ESTRUTURA', 'TIPOS DE VEÍCULOS', 'USUÁRIOS'];
 
   const addArea = () => {
     if (newAreaName.trim()) {
@@ -153,7 +153,7 @@ const ChecklistConfig: React.FC = () => {
             </div>
           </div>
           <div className="space-y-4">
-             <div className="space-y-1">
+            <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 uppercase">Assunto</label>
               <input type="text" placeholder="Ex: Manutenção Mensal" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100" />
             </div>
@@ -173,104 +173,63 @@ const ChecklistConfig: React.FC = () => {
           </button>
         </div>
       </Accordion>
-      <Accordion title="Notificação" isOpen={!!openPanels.notif} onToggle={() => togglePanel('notif')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
-            <Toggle label="Unidade recebe e-mail deste checklist?" active={true} description="Sempre que este checklist for concluído, os e-mails contidos no cadastro da unidade receberão uma cópia." />
-            <Toggle label="Unidade recebe cópia dos e-mails de agendamentos?" description="Sempre que este checklist for agendado ou estiver atrasado, a unidade receberá uma cópia das notificações." />
-            <Toggle label="Usuário recebe e-mails dos checklists aplicados por ele?" active={true} description="O usuário aplicador receberá uma cópia por e-mail de todos os checklists concluídos por ele." />
-            <Toggle label="Permite enviar e-mail de checklist em andamento?" description="Determina se é possível enviar um e-mail do checklist enquanto ainda não concluído." />
-            <Toggle label="Personalizar e-mail" description="Permite editar o assunto dos e-mails que serão enviados ao concluir o checklist." />
-          </div>
-      </Accordion>
+
       <Accordion title="Relatórios" isOpen={!!openPanels.reports} onToggle={() => togglePanel('reports')}>
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row gap-8 items-start">
-              <div className="flex-1 space-y-4 w-full">
-                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                  Imagem de cabeçalho do PDF 
-                  <span className="text-[9px] bg-blue-50 text-blue-900 px-1.5 py-0.5 rounded font-black">PDF OTIMIZADO</span>
-                </label>
-                <div className="flex items-center gap-6 p-6 border border-slate-100 rounded-xl bg-slate-50/50">
-                   <div className="h-16 w-48 bg-white border border-slate-200 rounded flex items-center justify-center overflow-hidden">
-                      <div className="flex items-center gap-2 font-black text-green-600 text-lg">
-                        <Check size={24} className="stroke-[3]" />
-                        checklistfácil
-                      </div>
-                   </div>
-                   <button className="text-xs font-black text-blue-900 uppercase hover:underline">Alterar Imagem</button>
+        <div className="space-y-8">
+          <div className="flex flex-col md:flex-row gap-8 items-start">
+            <div className="flex-1 space-y-4 w-full">
+              <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                Imagem de cabeçalho do PDF
+                <span className="text-[9px] bg-blue-50 text-blue-900 px-1.5 py-0.5 rounded font-black">PDF OTIMIZADO</span>
+              </label>
+              <div className="flex items-center gap-6 p-6 border border-slate-100 rounded-xl bg-slate-50/50">
+                <div className="h-16 w-48 bg-white border border-slate-200 rounded flex items-center justify-center overflow-hidden">
+                  <div className="flex items-center gap-2 font-black text-green-600 text-lg">
+                    <Check size={24} className="stroke-[3]" />
+                    checklistfácil
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1 w-full">
-                <Toggle label="Personalizar informações do PDF" active={false} />
-                <div className="mt-4 space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Título do relatório</label>
-                  <input type="text" placeholder="Relatório de Inspeção" disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-400" />
-                </div>
+                <button className="text-xs font-black text-blue-900 uppercase hover:underline">Alterar Imagem</button>
               </div>
             </div>
-            {/* Table data and toggles as detailed in earlier prompts... */}
+            <div className="flex-1 w-full">
+              <Toggle label="Personalizar informações do PDF" active={false} />
+              <div className="mt-4 space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Título do relatório</label>
+                <input type="text" placeholder="Relatório de Inspeção" disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-400" />
+              </div>
+            </div>
           </div>
+          {/* Table data and toggles as detailed in earlier prompts... */}
+        </div>
       </Accordion>
       <Accordion title="Preenchimento" isOpen={!!openPanels.fill} onToggle={() => togglePanel('fill')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
-            <Toggle label="Aplicar checklist somente pelo aplicativo" />
-            <Toggle label="Permitir anexar arquivos da memória do dispositivo" active={true} />
-            <Toggle label="Responder itens em massa" active={true} />
-            <Toggle label="Exibir resultado parcial" active={true} />
-            <Toggle label="Campos Nome e Cargo da assinatura são obrigatórios" />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
+          <Toggle label="Aplicar checklist somente pelo aplicativo" />
+          <Toggle label="Permitir anexar arquivos da memória do dispositivo" active={true} />
+          <Toggle label="Responder itens em massa" active={true} />
+          <Toggle label="Exibir resultado parcial" active={true} />
+          <Toggle label="Campos Nome e Cargo da assinatura são obrigatórios" />
+        </div>
       </Accordion>
-      <Accordion title="Agendamentos" isOpen={!!openPanels.sched} onToggle={() => togglePanel('sched')}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
-            <Toggle label="Aplicar somente checklist agendado?" />
-            <Toggle label="Agendamentos precisam ser aprovados?" />
-            <Toggle label="Bloquear a criação de agendamentos duplicados" />
-          </div>
-      </Accordion>
-      <Accordion title="Fluxo de análise" isOpen={!!openPanels.analysis} onToggle={() => togglePanel('analysis')}>
-           <div className="space-y-6">
-             <Toggle label="Checklists aplicados devem passar por análise" />
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-50">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Quantidade de aprovações necessárias</label>
-                  <input type="number" defaultValue="1" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm" />
-                </div>
-                <div className="flex items-end">
-                   <button className="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold text-xs uppercase hover:bg-slate-300 transition-colors">SELECIONAR TIPOS DE USUÁRIO</button>
-                </div>
-             </div>
-           </div>
-      </Accordion>
-      <Accordion title="Penalidades" isOpen={!!openPanels.penalties} onToggle={() => togglePanel('penalties')}>
-           <div className="space-y-8">
-             <div className="space-y-4">
-                <Toggle label="Penalidade de reincidência" />
-                <div className="flex items-center gap-6 pl-4 border-l-2 border-slate-100">
-                   <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500 uppercase">Aumentar em (%)</label>
-                      <input type="number" defaultValue="100" className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm w-32" />
-                   </div>
-                </div>
-             </div>
-           </div>
-      </Accordion>
+
+
+
       <Accordion title="Pós-conclusão" isOpen={!!openPanels.post} onToggle={() => togglePanel('post')}>
-           <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                <Toggle label="Compartilhar checklist por e-mail" active={true} />
-                <Toggle label="Assinatura" active={true} />
-              </div>
-           </div>
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+            <Toggle label="Compartilhar checklist por e-mail" active={true} />
+            <Toggle label="Assinatura" active={true} />
+          </div>
+        </div>
       </Accordion>
       <Accordion title="Cerca Digital" isOpen={!!openPanels.geo} onToggle={() => togglePanel('geo')}>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
-            <Toggle label="Bloquear início fora da unidade" />
-            <Toggle label="Bloquear conclusão fora da unidade" />
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
+          <Toggle label="Bloquear início fora da unidade" />
+          <Toggle label="Bloquear conclusão fora da unidade" />
+        </div>
       </Accordion>
-      <Accordion title="Fluxo de trabalho" isOpen={!!openPanels.flow} onToggle={() => togglePanel('flow')}>
-           <Toggle label="Aplicar somente em workflow?" />
-      </Accordion>
+
     </div>
   );
 
@@ -278,71 +237,180 @@ const ChecklistConfig: React.FC = () => {
     <div className="max-w-7xl w-full mx-auto p-8 space-y-6">
       {areas.length === 0 && !isAddingArea ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 flex flex-col items-center justify-center text-center space-y-6 shadow-sm animate-in zoom-in-95 duration-300">
-           <div className="space-y-2">
-             <h3 className="text-xl font-bold text-slate-800">Estrutura</h3>
-             <p className="text-sm text-slate-500">Nesta aba você consegue construir seu checklist (áreas, subáreas e itens). Escolha abaixo de qual forma deseja iniciar.</p>
-           </div>
-           <div className="flex flex-wrap gap-4 justify-center">
-             <button 
-               onClick={() => setIsAddingArea(true)}
-               className="bg-blue-900 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-800 transition-all shadow-lg active:scale-95"
-             >
-               Adicionar Área
-             </button>
-             <button className="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
-               Importar itens via planilha
-             </button>
-             <button className="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
-               Importar de outro checklist
-             </button>
-           </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-slate-800">Estrutura</h3>
+            <p className="text-sm text-slate-500">Nesta aba você consegue construir seu checklist (áreas, subáreas e itens). Escolha abaixo de qual forma deseja iniciar.</p>
+          </div>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <button
+              onClick={() => setIsAddingArea(true)}
+              className="bg-blue-900 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-blue-800 transition-all shadow-lg active:scale-95"
+            >
+              Adicionar Área
+            </button>
+            <button className="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
+              Importar itens via planilha
+            </button>
+            <button className="bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">
+              Importar de outro checklist
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
           {areas.map((area, areaIdx) => (
             <div key={areaIdx} className="border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden">
-               {/* Area Header */}
-               <div className="bg-blue-900 text-white p-4 flex items-center justify-between">
+              {/* Area Header */}
+              <div className="bg-blue-900 text-white p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <ChevronUp size={18} className="cursor-pointer" />
+                  <span className="font-bold text-sm tracking-tight">Área {areaIdx + 1}: {area.name}</span>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest">
+                    <button
+                      onClick={() => setOpenItemFormAreaIdx(areaIdx)}
+                      className="hover:text-blue-200 transition-colors"
+                    >
+                      Novo Item
+                    </button>
+                    <button className="hover:text-blue-200 transition-colors">Nova Subárea</button>
+                  </div>
+                  <div className="h-6 w-px bg-blue-800"></div>
                   <div className="flex items-center gap-3">
-                    <ChevronUp size={18} className="cursor-pointer" />
-                    <span className="font-bold text-sm tracking-tight">Área {areaIdx + 1}</span>
+                    <span className="text-[10px] font-bold opacity-60">Tipo de área</span>
+                    <select className="bg-blue-800 text-white text-[10px] font-bold px-2 py-1 rounded outline-none border-none cursor-pointer">
+                      <option>Padrão</option>
+                    </select>
+                    <MoreVertical size={16} className="cursor-pointer" />
                   </div>
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest">
-                      <button 
-                        onClick={() => setOpenItemFormAreaIdx(areaIdx)}
-                        className="hover:text-blue-200 transition-colors"
-                      >
-                        Novo Item
-                      </button>
-                      <button className="hover:text-blue-200 transition-colors">Nova Subárea</button>
-                    </div>
-                    <div className="h-6 w-px bg-blue-800"></div>
-                    <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-bold opacity-60">Tipo de área</span>
-                       <select className="bg-blue-800 text-white text-[10px] font-bold px-2 py-1 rounded outline-none border-none cursor-pointer">
-                         <option>Padrão</option>
-                       </select>
-                       <MoreVertical size={16} className="cursor-pointer" />
+                </div>
+              </div>
+
+              {/* Area Body: Item Form or List */}
+              {openItemFormAreaIdx === areaIdx ? (
+                <div className="p-8 border-t border-slate-100 bg-slate-50/50">
+                  <div className="border-2 border-blue-900 rounded-2xl bg-white p-8 space-y-6 shadow-xl relative animate-in zoom-in-95 duration-200">
+                    <button
+                      onClick={() => setOpenItemFormAreaIdx(null)}
+                      className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Item*</label>
+                        <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900" />
+                        <div className="flex justify-end">
+                          <span className="text-[10px] text-slate-400 font-bold">0 / 1000</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-12 gap-6">
+                        <div className="col-span-8 space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Tipo</label>
+                          <select
+                            value={itemType}
+                            onChange={(e) => setItemType(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900"
+                          >
+                            <option value="Avaliativo">Avaliativo</option>
+                            <option value="Texto">Texto</option>
+                            <option value="Data">Data</option>
+                            <option value="Cadastro">Cadastro</option>
+                            <option value="Numérico">Numérico</option>
+                            <option value="Lista de Seleção">Lista de Seleção</option>
+                            <option value="Especial">Especial</option>
+                          </select>
+                        </div>
+                        <div className="col-span-4 space-y-1">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Peso*</label>
+                          <input type="number" defaultValue="1" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2">
+                        <label className="text-xs font-bold text-slate-800">Selecione os complementos desejados.</label>
+                        <div className="flex gap-2">
+                          <button className="flex items-center gap-2 px-4 py-1.5 bg-blue-100 text-blue-900 rounded-full text-xs font-bold border border-blue-200">
+                            <Clipboard size={14} />
+                            Anexos
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 pt-2">
+                        <label className="text-xs text-slate-500">Configure sua escala avaliativa e sua obrigatoriedade</label>
+                        <div className="flex items-center gap-4">
+                          <button className="w-8 h-8 rounded border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50">
+                            <ChevronLeft size={16} />
+                          </button>
+                          <div className="flex gap-4">
+                            <button className="w-12 h-12 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-sm text-red-600 font-black text-xl hover:border-red-200 transition-colors">
+                              N
+                            </button>
+                            <button className="w-12 h-12 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-sm text-green-600 font-black text-xl hover:border-green-200 transition-colors">
+                              S
+                            </button>
+                          </div>
+                          <button className="w-8 h-8 rounded border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50">
+                            <ChevronRight size={16} />
+                          </button>
+                        </div>
+                        <div className="flex justify-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-slate-200"></div>
+                          <div className="w-2 h-2 rounded-full bg-slate-200"></div>
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2">
+                        <label className="text-xs text-slate-500">Selecione as opções adicionais para a escala e sua obrigatoriedade</label>
+                        <div className="flex gap-2">
+                          <button className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50">N/A</button>
+                          <button className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><ImageIcon size={16} /></button>
+                          <button className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><MessageSquare size={16} /></button>
+                          <button className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><AlertCircle size={16} /></button>
+                          <button className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><Settings size={16} /></button>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button className="w-full text-left px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 flex justify-between items-center hover:bg-slate-100 transition-colors">
+                          Dica do item
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+
+                      <div className="flex justify-end gap-4 pt-4 border-t border-slate-100">
+                        <button onClick={() => setOpenItemFormAreaIdx(null)} className="text-xs font-black uppercase text-blue-900">Cancelar</button>
+                        <button onClick={() => setOpenItemFormAreaIdx(null)} className="bg-blue-900 text-white px-6 py-2 rounded-lg text-xs font-black uppercase">Salvar Item</button>
+                      </div>
                     </div>
                   </div>
-               </div>
-               {/* Area Body implementation omitted for simplicity here but fully functional */}
+                </div>
+              ) : (
+                <div className="p-12 text-center">
+                  <p className="text-slate-400 text-sm">Nenhum item cadastrado nesta área.</p>
+                  <p className="text-xs text-slate-300 mt-1">Utilize o botão "Novo Item" acima para adicionar.</p>
+                </div>
+              )}
             </div>
           ))}
           {isAddingArea && (
             <div className="border-2 border-blue-900 rounded-2xl bg-white p-8 space-y-6 shadow-xl">
-               <input 
-                 type="text" 
-                 value={newAreaName}
-                 onChange={(e) => setNewAreaName(e.target.value)}
-                 placeholder="Nome da área" 
-                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm"
-               />
-               <div className="flex justify-end gap-4">
-                  <button onClick={() => setIsAddingArea(false)} className="text-xs font-black uppercase text-blue-900">Cancelar</button>
-                  <button onClick={addArea} className="bg-blue-900 text-white px-6 py-2 rounded-lg text-xs font-black uppercase">Salvar</button>
-               </div>
+              <input
+                type="text"
+                value={newAreaName}
+                onChange={(e) => setNewAreaName(e.target.value)}
+                placeholder="Nome da área"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm"
+              />
+              <div className="flex justify-end gap-4">
+                <button onClick={() => setIsAddingArea(false)} className="text-xs font-black uppercase text-blue-900">Cancelar</button>
+                <button onClick={addArea} className="bg-blue-900 text-white px-6 py-2 rounded-lg text-xs font-black uppercase">Salvar</button>
+              </div>
             </div>
           )}
         </div>
@@ -380,23 +448,32 @@ const ChecklistConfig: React.FC = () => {
 
   const renderTiposUnidade = () => (
     <div className="max-w-7xl w-full mx-auto p-8 space-y-4 animate-in fade-in duration-300">
-      <SearchAndFilter placeholder="Buscar tipo de unidade..." />
+      <SearchAndFilter placeholder="Buscar tipo de veículo..." />
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-widest">
             <tr>
               <th className="px-6 py-4 flex items-center gap-1 cursor-pointer hover:text-slate-600 transition-colors">
-                Tipo de Unidade <ChevronDown size={14} className="mt-0.5" />
+                Tipo de Veículo <ChevronDown size={14} className="mt-0.5" />
               </th>
               <th className="px-6 py-4 text-right">Vincular</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {['tp_unidade1', 'tp_unidade2', 'tp_unidade3'].map((type, idx) => (
-              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}>
-                <td className="px-6 py-4 text-sm font-medium text-slate-700">{type}</td>
+            {[
+              { id: '1', name: 'Cavalo Mecânico' },
+              { id: '2', name: 'Carreta Baú' },
+              { id: '3', name: 'Carreta Sider' },
+              { id: '4', name: 'Bitrem' },
+              { id: '5', name: 'Rodotrem' },
+              { id: '6', name: 'VUC' },
+              { id: '7', name: 'Toco' },
+              { id: '8', name: 'Truck' },
+            ].map((type) => (
+              <tr key={type.id} className="bg-white hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-slate-700">{type.name}</td>
                 <td className="px-6 py-4 text-right">
-                  <TableToggle active={idx === 0} />
+                  <TableToggle active={['1', '2', '3'].includes(type.id)} />
                 </td>
               </tr>
             ))}
@@ -422,11 +499,25 @@ const ChecklistConfig: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {['usuario1', 'usuario2', 'usuario3'].map((user, idx) => (
-              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}>
-                <td className="px-6 py-4 text-sm font-medium text-slate-700">{user}</td>
-                <td className="px-6 py-4 text-center"><TableToggle active={idx < 2} /></td>
-                <td className="px-6 py-4 text-center"><TableToggle active={idx === 0} /></td>
+            {[
+              { id: '1', name: 'Admin', type: 'Administrador' },
+              { id: '2', name: 'Arthur Matos Sousa', type: 'GM Transportadora | Logística' },
+              { id: '3', name: 'Carolina Almeida', type: 'GM | Recursos Humanos' },
+              { id: '4', name: 'Diego Rodrigues', type: 'GM Transportadora | Manutenção' },
+              { id: '5', name: 'Fagner Frazão', type: 'GM | TI' },
+              { id: '6', name: 'Fernando Rolim', type: 'GM Transportadora | Ger. Logística' },
+              { id: '7', name: 'Jeniffer dos Santos Luz', type: 'GM Transportadora | Téc. Segurança' },
+              { id: '8', name: 'Laurenise Araujo Ferreira', type: 'GM Transportadora | Téc. Segurança' },
+            ].map((user) => (
+              <tr key={user.id} className="bg-white hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-700">{user.name}</span>
+                    <span className="text-xs text-slate-400">{user.type}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-center"><TableToggle active={['1', '2'].includes(user.id)} /></td>
+                <td className="px-6 py-4 text-center"><TableToggle active={user.id === '1'} /></td>
                 <td className="px-6 py-4 text-center"><TableToggle active={false} /></td>
               </tr>
             ))}
@@ -457,9 +548,8 @@ const ChecklistConfig: React.FC = () => {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
-              activeTab === tab ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
+            className={`py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === tab ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
           >
             {tab}
           </button>
@@ -469,26 +559,25 @@ const ChecklistConfig: React.FC = () => {
       <div className="flex-1">
         {activeTab === 'DADOS CADASTRAIS' && renderDadosCadastrais()}
         {activeTab === 'ESTRUTURA' && renderEstrutura()}
-        {activeTab === 'DEPARTAMENTOS' && renderDepartamentos()}
-        {activeTab === 'TIPOS DE UNIDADE' && renderTiposUnidade()}
+        {activeTab === 'TIPOS DE VEÍCULOS' && renderTiposUnidade()}
         {activeTab === 'USUÁRIOS' && renderUsuarios()}
-        {!['DADOS CADASTRAIS', 'ESTRUTURA', 'DEPARTAMENTOS', 'TIPOS DE UNIDADE', 'USUÁRIOS'].includes(activeTab) && (
+        {!['DADOS CADASTRAIS', 'ESTRUTURA', 'TIPOS DE VEÍCULOS', 'USUÁRIOS'].includes(activeTab) && (
           <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest">Módulo em Desenvolvimento</div>
         )}
       </div>
 
       <footer className="fixed bottom-0 left-72 right-0 h-16 bg-white border-t border-slate-200 px-8 flex items-center justify-between z-40 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-         <div className="flex items-center gap-3">
-           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ativo</span>
-           <button className="relative inline-flex h-5 w-10 items-center rounded-full bg-blue-900">
-             <span className="h-3 w-3 translate-x-6 rounded-full bg-white flex items-center justify-center">
-                <Check size={8} className="text-blue-900 stroke-[4]" />
-             </span>
-           </button>
-         </div>
-         <button className="px-10 py-2.5 bg-blue-900 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-800 shadow-md transition-all active:scale-95">
-           Salvar
-         </button>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ativo</span>
+          <button className="relative inline-flex h-5 w-10 items-center rounded-full bg-blue-900">
+            <span className="h-3 w-3 translate-x-6 rounded-full bg-white flex items-center justify-center">
+              <Check size={8} className="text-blue-900 stroke-[4]" />
+            </span>
+          </button>
+        </div>
+        <button className="px-10 py-2.5 bg-blue-900 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-800 shadow-md transition-all active:scale-95">
+          Salvar
+        </button>
       </footer>
     </div>
   );
