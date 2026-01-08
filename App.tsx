@@ -3,13 +3,13 @@ import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'r
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import ChecklistHistory from './components/ChecklistHistory';
-import FleetManagement from './components/Configuration/FleetManagement';
-import Drivers from './components/Configuration/Drivers';
-import ChecklistConfig from './components/Configuration/ChecklistConfig';
-import ChecklistList from './components/Configuration/ChecklistList';
-import AccessProfiles from './components/Configuration/AccessProfiles';
-import UserManagement from './components/Configuration/UserManagement';
-import VehicleTypeManagement from './components/Configuration/VehicleTypeManagement';
+import FleetManagement from './src/features/fleets/FleetManagement';
+import Drivers from './src/features/users/Drivers';
+import ChecklistConfig from './src/features/checklists/ChecklistConfig';
+import ChecklistList from './src/features/checklists/ChecklistList';
+import AccessProfiles from './src/features/access-profiles/AccessProfiles';
+import UserManagement from './src/features/users/UserManagement';
+import VehicleTypeManagement from './src/features/fleets/VehicleTypeManagement';
 import LoginPage from './components/LoginPage';
 import { HelpCircle, Bell, Search as SearchIcon } from 'lucide-react';
 
