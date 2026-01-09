@@ -1,0 +1,98 @@
+{
+  "id": "chk_123456789",
+  "type": "Checklist",
+  "name": "Manutenção Preventiva - Frota Pesada",
+  "subject": "Inspeção Semanal",
+  "description": "Verificação completa dos itens de segurança, mecânica e documentação do veículo.",
+  "settings": {
+    "appOnly": false,
+    "allowGallery": true,
+    "bulkAnswer": true,
+    "partialResult": true,
+    "mandatorySignature": true,
+    "shareEmail": true,
+    "geoFenceStart": false,
+    "geoFenceEnd": false
+  },
+  "structure": {
+    "areas": [
+      {
+        "id": "area_01",
+        "name": "Cabine e Documentação",
+        "type": "Padrão",
+        "items": [
+          {
+            "id": "item_01",
+            "name": "Documento do Veículo (CRLV)",
+            "type": "Avaliativo",
+            "mandatoryAttachment": true,
+            "scaleType": "ns",
+            "config": {
+              "hint": "Verificar se o licenciamento está em dia e anexar foto do documento."
+            }
+          },
+          {
+            "id": "item_02",
+            "name": "Quilometragem Atual",
+            "type": "Numérico",
+            "mandatoryAttachment": false,
+            "config": {
+              "numericOption": "Quantidade"
+            }
+          }
+        ],
+        "subAreas": []
+      },
+      {
+        "id": "area_02",
+        "name": "Pneus e Rodas",
+        "type": "Padrão",
+        "items": [],
+        "subAreas": [
+          {
+            "id": "sub_01",
+            "name": "Eixo Dianteiro",
+            "items": [
+              {
+                "id": "item_03",
+                "name": "Estado de conservação dos pneus",
+                "type": "Lista de Seleção",
+                "mandatoryAttachment": false,
+                "config": {
+                  "selectionType": "single",
+                  "selectionOptions": ["Novos", "Meia vida", "Carecas", "Recapados"]
+                }
+              },
+              {
+                "id": "item_04",
+                "name": "Pressão dos Pneus (PSI)",
+                "type": "Texto",
+                "mandatoryAttachment": false,
+                "config": {
+                  "hint": "Informar a calibragem encontrada."
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "area_03",
+        "name": "Segurança",
+        "type": "Padrão",
+        "items": [
+          {
+            "id": "item_05",
+            "name": "Data de Validade do Extintor",
+            "type": "Data",
+            "mandatoryAttachment": true,
+            "config": {
+              "hint": "Verificar a data no selo do INMETRO."
+            }
+          }
+        ],
+        "subAreas": []
+      }
+    ]
+  }
+}
