@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -150,7 +150,12 @@ interface Area {
   subAreas: SubArea[];
 }
 
-const ChecklistConfig: React.FC = () => {
+interface ChecklistConfigProps {
+  initialTemplate?: ChecklistTemplate | null;
+  onBack: () => void;
+}
+
+const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBack }) => {
   const [activeTab, setActiveTab] = useState('DADOS CADASTRAIS');
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({ geral: true });
 
@@ -205,6 +210,94 @@ const ChecklistConfig: React.FC = () => {
   const [selectionOptions, setSelectionOptions] = useState<string[]>([]);
   const [isAddingOption, setIsAddingOption] = useState(false);
   const [newOptionText, setNewOptionText] = useState('');
+
+  // Initialize state from initialTemplate if provided
+  useEffect(() => {
+    if (initialTemplate) {
+      setChecklistId(initialTemplate.id);
+      setName(initialTemplate.name);
+      setSubject(initialTemplate.subject);
+      setDescription(initialTemplate.description);
+      setSettings(initialTemplate.settings);
+      setSelectedVehicleTypes(initialTemplate.target_vehicle_types as any);
+      setSelectedUsers(initialTemplate.assigned_user_ids);
+
+      if (initialTemplate.structure?.areas) {
+        setAreas(initialTemplate.structure.areas as any);
+      }
+    } else {
+      // Setup for a new template
+      setChecklistId(`chk_${Date.now()}`);
+      setName('Novo Checklist (1)');
+      setSubject('');
+      setDescription('');
+      setSettings({
+        app_only: false,
+        allow_gallery: true,
+        bulk_answer: true,
+        partial_result: true,
+        mandatory_signature: true,
+        share_email: true,
+        geo_fence_start: false,
+        geo_fence_end: false
+      });
+      setSelectedVehicleTypes([]);
+      setSelectedUsers([]);
+      setAreas([]);
+    }
+    setActiveTab('DADOS CADASTRAIS');
+  }, [initialTemplate]);
+
+
+
+  const loadTemplate = (template: ChecklistTemplate) => {
+    // Preencher todos os estados com os dados do template
+    setChecklistId(template.id);
+    setName(template.name);
+    setSubject(template.subject);
+    setDescription(template.description);
+    setSettings(template.settings);
+    setSelectedVehicleTypes(template.target_vehicle_types as any);
+    setSelectedUsers(template.assigned_user_ids);
+
+    // Carregar estrutura (áreas, subáreas e itens)
+    if (template.structure?.areas) {
+      setAreas(template.structure.areas as any);
+    }
+
+    // Mudar para modo de edição
+    setIsCreatingNew(true);
+    setActiveTab('DADOS CADASTRAIS');
+  };
+
+  const createNewTemplate = () => {
+    // Resetar todos os estados para criar um novo template
+    setChecklistId(`chk_${Date.now()}`);
+    setName('Novo Checklist (1)');
+    setSubject('');
+    setDescription('');
+    setSettings({
+      app_only: false,
+      allow_gallery: true,
+      bulk_answer: true,
+      partial_result: true,
+      mandatory_signature: true,
+      share_email: true,
+      geo_fence_start: false,
+      geo_fence_end: false
+    });
+    setSelectedVehicleTypes([]);
+    setSelectedUsers([]);
+    setAreas([]);
+    setIsCreatingNew(true);
+    setActiveTab('DADOS CADASTRAIS');
+  };
+
+  const backToList = () => {
+    setIsCreatingNew(false);
+    loadTemplates();
+  };
+
 
   const deleteArea = (idx: number) => {
     const newAreas = [...areas];
@@ -268,6 +361,9 @@ const ChecklistConfig: React.FC = () => {
       if (error) throw error;
 
       alert('Checklist salvo com sucesso!');
+
+      // Voltar para a lista via callback
+      onBack();
     } catch (error: any) {
       console.error('Erro ao salvar checklist:', error.message);
       alert('Erro ao salvar: ' + error.message);
@@ -1239,6 +1335,8 @@ const ChecklistConfig: React.FC = () => {
     );
   }
 
+
+
   return (
     <div className="flex flex-col min-h-full bg-slate-50 pb-24 animate-in fade-in duration-500">
       <div className="bg-white border-b border-slate-200 px-8 py-6">
@@ -1248,7 +1346,10 @@ const ChecklistConfig: React.FC = () => {
           <span className="text-slate-600">Configurar Checklist</span>
         </div>
         <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
+          >
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Configurar Checklist</h1>

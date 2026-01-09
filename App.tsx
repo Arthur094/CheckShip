@@ -15,6 +15,7 @@ import { HelpCircle, Bell, Search as SearchIcon } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -31,9 +32,25 @@ const MainLayout: React.FC = () => {
       case 'config-profiles':
         return <AccessProfiles />;
       case 'config-models':
-        return <ChecklistList onNew={() => setActiveTab('config-create')} />;
+        return (
+          <ChecklistList
+            onNew={() => {
+              setSelectedTemplate(null);
+              setActiveTab('config-create');
+            }}
+            onEdit={(template) => {
+              setSelectedTemplate(template);
+              setActiveTab('config-create');
+            }}
+          />
+        );
       case 'config-create':
-        return <ChecklistConfig />;
+        return (
+          <ChecklistConfig
+            initialTemplate={selectedTemplate}
+            onBack={() => setActiveTab('config-models')}
+          />
+        );
       default:
         return (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 p-20 animate-pulse">

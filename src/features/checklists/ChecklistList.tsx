@@ -1,20 +1,49 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { ChecklistTemplate } from '../../../types';
 
 interface ChecklistListProps {
   onNew: () => void;
+  onEdit: (template: ChecklistTemplate) => void;
 }
 
-const ChecklistList: React.FC<ChecklistListProps> = ({ onNew }) => {
-  // Cleared the list as requested
-  const mockChecklists: { name: string; updated: string }[] = [];
+const ChecklistList: React.FC<ChecklistListProps> = ({ onNew, onEdit }) => {
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar templates:', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredTemplates = templates.filter(t =>
+    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="p-8 space-y-6 animate-in fade-in duration-500">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Checklists</h1>
-        <button 
+        <button
           onClick={onNew}
           className="bg-blue-900 text-white px-8 py-2.5 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-blue-800 transition-all shadow-md flex items-center gap-2 active:scale-95"
         >
@@ -27,9 +56,11 @@ const ChecklistList: React.FC<ChecklistListProps> = ({ onNew }) => {
         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
           <Search size={18} />
         </div>
-        <input 
-          type="text" 
-          placeholder="Buscar" 
+        <input
+          type="text"
+          placeholder="Buscar"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hover:text-blue-900">
@@ -39,26 +70,51 @@ const ChecklistList: React.FC<ChecklistListProps> = ({ onNew }) => {
 
       {/* Checklist Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        {mockChecklists.length > 0 ? (
+        {isLoading ? (
+          <div className="p-20 flex flex-col items-center justify-center text-center space-y-4">
+            <p className="text-slate-400 animate-pulse">Carregando checklists...</p>
+          </div>
+        ) : filteredTemplates.length > 0 ? (
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-widest">
               <tr>
                 <th className="px-6 py-4 w-10"><input type="checkbox" className="rounded" /></th>
-                <th className="px-6 py-4 flex items-center gap-1 cursor-pointer hover:text-slate-600 transition-colors">
-                  Nome <ChevronDown size={14} className="mt-0.5" />
-                </th>
+                <th className="px-6 py-4">Nome</th>
+                <th className="px-6 py-4">Assunto</th>
                 <th className="px-6 py-4 text-right">Última Atualização</th>
                 <th className="px-6 py-4 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {mockChecklists.map((item, idx) => (
-                <tr key={idx} className="hover:bg-blue-50/20 transition-colors cursor-pointer group">
-                  <td className="px-6 py-4"><input type="checkbox" className="rounded" /></td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-600 group-hover:text-blue-900">{item.name}</td>
-                  <td className="px-6 py-4 text-xs font-bold text-blue-900 text-right hover:underline">{item.updated}</td>
+              {filteredTemplates.map((template) => (
+                <tr
+                  key={template.id}
+                  className="hover:bg-blue-50/20 transition-colors cursor-pointer group"
+                  onClick={() => onEdit(template)}
+                >
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" className="rounded" />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-slate-700 group-hover:text-blue-900">{template.name}</span>
+                      <span className="text-[10px] text-slate-400">{template.id}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{template.subject || '-'}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-blue-900 text-right">
+                    {new Date(template.updated_at).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </td>
                   <td className="px-6 py-4 text-slate-400">
-                     <MoreVertical size={16} className="cursor-pointer hover:text-blue-900" />
+                    <button className="p-1 hover:bg-slate-100 rounded-md transition-all">
+                      <MoreVertical size={16} className="cursor-pointer hover:text-blue-900" />
+                    </button>
                   </td>
                 </tr>
               ))}
