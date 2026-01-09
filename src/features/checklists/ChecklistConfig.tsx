@@ -162,14 +162,14 @@ const ChecklistConfig: React.FC = () => {
 
   // Settings
   const [settings, setSettings] = useState({
-    appOnly: false,
-    allowGallery: true,
-    bulkAnswer: true,
-    partialResult: true,
-    mandatorySignature: true,
-    shareEmail: true,
-    geoFenceStart: false,
-    geoFenceEnd: false
+    app_only: false,
+    allow_gallery: true,
+    bulk_answer: true,
+    partial_result: true,
+    mandatory_signature: true,
+    share_email: true,
+    geo_fence_start: false,
+    geo_fence_end: false
   });
 
   // Selections
@@ -232,33 +232,33 @@ const ChecklistConfig: React.FC = () => {
               id: item.id,
               name: item.name,
               type: item.type as ItemType,
-              mandatoryAttachment: item.mandatoryAttachment,
+              mandatory_attachment: item.mandatoryAttachment,
               config: {
                 hint: item.config?.hint,
-                scaleType: item.scaleType as any,
-                selectionOptions: item.config?.selectionOptions || []
+                scale_type: item.scaleType as any,
+                selection_options: item.config?.selectionOptions || []
               }
             })),
-            subAreas: area.subAreas.map(sub => ({
+            sub_areas: area.subAreas.map(sub => ({
               id: sub.id,
               name: sub.name,
               items: sub.items.map(sitem => ({
                 id: sitem.id,
                 name: sitem.name,
                 type: sitem.type as ItemType,
-                mandatoryAttachment: sitem.mandatoryAttachment,
+                mandatory_attachment: sitem.mandatoryAttachment,
                 config: {
                   hint: sitem.config?.hint,
-                  scaleType: sitem.scaleType as any,
-                  selectionOptions: sitem.config?.selectionOptions || []
+                  scale_type: sitem.scaleType as any,
+                  selection_options: sitem.config?.selectionOptions || []
                 }
               }))
             }))
           }))
         },
-        targetVehicleTypes: selectedVehicleTypes as any,
-        assignedUserIds: selectedUsers,
-        updatedAt: new Date().toISOString()
+        target_vehicle_types: selectedVehicleTypes as any,
+        assigned_user_ids: selectedUsers,
+        updated_at: new Date().toISOString()
       };
 
       const { error } = await supabase
