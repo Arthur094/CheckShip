@@ -19,8 +19,6 @@ import {
   Line,
   Cell
 } from 'recharts';
-import StartInspectionModal from '../src/features/inspections/StartInspectionModal';
-import InspectionForm from '../src/features/inspections/InspectionForm';
 
 const data = [
   { name: 'Seg', checklists: 45, conformidade: 92 },
@@ -39,43 +37,12 @@ const maintenanceStatus = [
 ];
 
 const Dashboard: React.FC = () => {
-  const [showInspectionModal, setShowInspectionModal] = useState(false);
-  const [activeInspection, setActiveInspection] = useState<{ checklistId: string, vehicleId: string } | null>(null);
-
-  if (activeInspection) {
-    return <InspectionForm
-      checklistId={activeInspection.checklistId}
-      vehicleId={activeInspection.vehicleId}
-      onClose={() => setActiveInspection(null)}
-    />;
-  }
-
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
-      {showInspectionModal && (
-        <StartInspectionModal
-          onClose={() => setShowInspectionModal(false)}
-          onStart={(checklistId, vehicleId) => {
-            setShowInspectionModal(false);
-            setActiveInspection({ checklistId, vehicleId });
-          }}
-        />
-      )}
       <header>
         <h1 className="text-2xl font-bold text-slate-800">Dashboard Operacional</h1>
         <p className="text-slate-500">Visão geral da frota e conformidade de inspeções.</p>
       </header>
-
-      {/* Top Cards */}
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => setShowInspectionModal(true)}
-          className="bg-blue-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-800 shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest"
-        >
-          <ClipboardList size={18} />
-          Iniciar Inspeção
-        </button>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group hover:border-blue-200 transition-colors cursor-default">

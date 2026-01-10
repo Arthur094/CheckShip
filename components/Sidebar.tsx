@@ -6,9 +6,10 @@ import { NAV_ITEMS, COLORS } from '../constants';
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onStartInspection: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onStartInspection }) => {
   const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({ config: true });
 
   const toggleSubMenu = (id: string) => {
@@ -46,7 +47,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
       {/* Main Action Button */}
       <div className="px-4 mb-6">
-        <button className="w-full flex items-center justify-center gap-2 py-3 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold transition-all shadow-md active:scale-95">
+        <button
+          onClick={onStartInspection}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold transition-all shadow-md active:scale-95">
           <Play size={16} fill="white" />
           INICIAR INSPEÇÃO
         </button>
@@ -61,9 +64,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 <div>
                   <button
                     onClick={() => toggleSubMenu(item.id)}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg text-sm font-medium transition-colors ${
-                      activeTab.startsWith(item.id) ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'
-                    }`}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg text-sm font-medium transition-colors ${activeTab.startsWith(item.id) ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       {item.icon}
@@ -77,9 +79,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                         <li key={child.id}>
                           <button
                             onClick={() => setActiveTab(child.id)}
-                            className={`w-full text-left p-2 rounded-lg text-xs font-medium transition-colors pl-4 ${
-                              activeTab === child.id ? 'text-blue-900 bg-white font-bold' : 'text-slate-500 hover:bg-slate-200'
-                            }`}
+                            className={`w-full text-left p-2 rounded-lg text-xs font-medium transition-colors pl-4 ${activeTab === child.id ? 'text-blue-900 bg-white font-bold' : 'text-slate-500 hover:bg-slate-200'
+                              }`}
                           >
                             {child.label}
                           </button>
@@ -91,9 +92,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
               ) : (
                 <button
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === item.id ? 'bg-white text-blue-900 shadow-sm border border-slate-200 font-bold' : 'text-slate-600 hover:bg-slate-200'
-                  }`}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === item.id ? 'bg-white text-blue-900 shadow-sm border border-slate-200 font-bold' : 'text-slate-600 hover:bg-slate-200'
+                    }`}
                 >
                   {item.icon}
                   <span>{item.label}</span>

@@ -13,11 +13,29 @@ import VehicleTypeManagement from './src/features/fleets/VehicleTypeManagement';
 import LoginPage from './components/LoginPage';
 import { HelpCircle, Bell, Search as SearchIcon } from 'lucide-react';
 
+import StartInspectionModal from './src/features/inspections/StartInspectionModal';
+import InspectionForm from './src/features/inspections/InspectionForm';
+
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
+  // Inspection State
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [activeInspection, setActiveInspection] = useState<{ checklistId: string, vehicleId: string } | null>(null);
+
   const renderContent = () => {
+    // If there is an active inspection, render the form FULL SCREEN (overriding tab content)
+    if (activeInspection) {
+      return (
+        <InspectionForm
+          checklistId={activeInspection.checklistId}
+          vehicleId={activeInspection.vehicleId}
+          onClose={() => setActiveInspection(null)}
+        />
+      );
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
@@ -63,8 +81,23 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      {/* Inspection Modal */}
+      {showInspectionModal && (
+        <StartInspectionModal
+          onClose={() => setShowInspectionModal(false)}
+          onStart={(checklistId, vehicleId) => {
+            setShowInspectionModal(false);
+            setActiveInspection({ checklistId, vehicleId });
+          }}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onStartInspection={() => setShowInspectionModal(true)}
+      />
 
       {/* Main Content Wrapper */}
       <main className="flex-1 ml-72 flex flex-col min-w-0">
@@ -93,7 +126,7 @@ const MainLayout: React.FC = () => {
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-bold text-slate-800 leading-none">Admin Master</p>
-                <p className="text-[10px] text-slate-400 font-medium">CheckShip Corp</p>
+                <p className="text-xs text-slate-400 font-medium font-mono">CheckShip Corp</p>
               </div>
               <div className="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                 AM

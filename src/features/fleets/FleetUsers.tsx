@@ -25,7 +25,7 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
             const { data: driversData, error: driversError } = await supabase
                 .from('profiles')
                 .select('id, full_name, role')
-                .eq('role', 'MOTORISTA')
+                // Removed role filter to show all users including Admin Master
                 .order('full_name');
 
             if (driversError) throw driversError;
