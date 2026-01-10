@@ -36,6 +36,8 @@ import {
   ItemType,
   VehicleType
 } from '../../../types';
+import ChecklistVehicleTypes from './ChecklistVehicleTypes';
+import ChecklistUsers from './ChecklistUsers';
 
 interface AccordionProps {
   title: string;
@@ -250,53 +252,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
 
 
-  const loadTemplate = (template: ChecklistTemplate) => {
-    // Preencher todos os estados com os dados do template
-    setChecklistId(template.id);
-    setName(template.name);
-    setSubject(template.subject);
-    setDescription(template.description);
-    setSettings(template.settings);
-    setSelectedVehicleTypes(template.target_vehicle_types as any);
-    setSelectedUsers(template.assigned_user_ids);
 
-    // Carregar estrutura (áreas, subáreas e itens)
-    if (template.structure?.areas) {
-      setAreas(template.structure.areas as any);
-    }
-
-    // Mudar para modo de edição
-    setIsCreatingNew(true);
-    setActiveTab('DADOS CADASTRAIS');
-  };
-
-  const createNewTemplate = () => {
-    // Resetar todos os estados para criar um novo template
-    setChecklistId(`chk_${Date.now()}`);
-    setName('Novo Checklist (1)');
-    setSubject('');
-    setDescription('');
-    setSettings({
-      app_only: false,
-      allow_gallery: true,
-      bulk_answer: true,
-      partial_result: true,
-      mandatory_signature: true,
-      share_email: true,
-      geo_fence_start: false,
-      geo_fence_end: false
-    });
-    setSelectedVehicleTypes([]);
-    setSelectedUsers([]);
-    setAreas([]);
-    setIsCreatingNew(true);
-    setActiveTab('DADOS CADASTRAIS');
-  };
-
-  const backToList = () => {
-    setIsCreatingNew(false);
-    loadTemplates();
-  };
 
 
   const deleteArea = (idx: number) => {
@@ -306,10 +262,23 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     setActiveAreaMenuIdx(null);
   };
 
-  const handleSave = async () => {
+  const performSave = async (silent = false): Promise<boolean> => {
     try {
+      if (!silent) {
+        // Validation only if not silent? Or always?
+        // Let's validate name at least
+        if (!name.trim()) {
+          alert('O nome do checklist é obrigatório.');
+          return false;
+        }
+      }
+
+      // Handle temp ID
+      const isTempId = checklistId.startsWith('chk_');
+      const idToSend = isTempId ? undefined : checklistId;
+
       const checklistData: Partial<ChecklistTemplate> = {
-        id: checklistId,
+        id: idToSend,
         name: name,
         subject: subject,
         description: description,
@@ -354,21 +323,32 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('checklist_templates')
-        .upsert(checklistData);
+        .upsert(checklistData)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      alert('Checklist salvo com sucesso!');
+      if (data) {
+        setChecklistId(data.id);
+        // If it was temp, we are no longer in creation mode technically, or we preserve it.
+      }
 
-      // Voltar para a lista via callback
-      onBack();
+      if (!silent) {
+        alert('Checklist salvo com sucesso!');
+        onBack();
+      }
+      return true;
     } catch (error: any) {
       console.error('Erro ao salvar checklist:', error.message);
-      alert('Erro ao salvar: ' + error.message);
+      if (!silent) alert('Erro ao salvar: ' + error.message);
+      return false;
     }
   };
+
+  const handleSave = () => performSave(false);
 
   const deleteSubArea = (areaIdx: number, subAreaIdx: number) => {
     const newAreas = [...areas];
@@ -1238,99 +1218,16 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
   function renderTiposUnidade() {
     return (
-      <div className="max-w-7xl w-full mx-auto p-8 space-y-4 animate-in fade-in duration-300">
-        <SearchAndFilter placeholder="Buscar tipo de veículo..." />
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-              <tr>
-                <th className="px-6 py-4 flex items-center gap-1 cursor-pointer hover:text-slate-600 transition-colors">
-                  Tipo de Veículo <ChevronDown size={14} className="mt-0.5" />
-                </th>
-                <th className="px-6 py-4 text-right">Vincular</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[
-                { id: '1', name: 'Cavalo Mecânico' },
-                { id: '2', name: 'Carreta Baú' },
-                { id: '3', name: 'Carreta Sider' },
-                { id: '4', name: 'Bitrem' },
-                { id: '5', name: 'Rodotrem' },
-                { id: '6', name: 'VUC' },
-                { id: '7', name: 'Toco' },
-                { id: '8', name: 'Truck' },
-              ]?.map((type) => (
-                <tr key={type.id} className="bg-white hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-700">{type.name}</td>
-                  <td className="px-6 py-4 text-right">
-                    <TableToggle
-                      active={selectedVehicleTypes.includes(type.id)}
-                      onChange={(val) => {
-                        if (val) setSelectedVehicleTypes(prev => [...prev, type.id]);
-                        else setSelectedVehicleTypes(prev => prev.filter(tid => tid !== type.id));
-                      }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="max-w-7xl w-full mx-auto p-8 h-[calc(100vh-200px)]">
+        <ChecklistVehicleTypes checklistId={checklistId} onEnsureExists={() => performSave(true)} />
       </div>
     );
   }
 
   function renderUsuarios() {
     return (
-      <div className="max-w-7xl w-full mx-auto p-8 space-y-4 animate-in fade-in duration-300">
-        <SearchAndFilter placeholder="Buscar usuário por nome..." />
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-              <tr>
-                <th className="px-6 py-4 flex items-center gap-1 cursor-pointer hover:text-slate-600 transition-colors">
-                  Usuário <ChevronDown size={14} className="mt-0.5" />
-                </th>
-                <th className="px-6 py-4 text-center">Aplica</th>
-                <th className="px-6 py-4 text-center">Relatório</th>
-                <th className="px-6 py-4 text-center">E-mail</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[
-                { id: '1', name: 'Admin', type: 'Administrador' },
-                { id: '2', name: 'Arthur Matos Sousa', type: 'GM Transportadora | Logística' },
-                { id: '3', name: 'Carolina Almeida', type: 'GM | Recursos Humanos' },
-                { id: '4', name: 'Diego Rodrigues', type: 'GM Transportadora | Manutenção' },
-                { id: '5', name: 'Fagner Frazão', type: 'GM | TI' },
-                { id: '6', name: 'Fernando Rolim', type: 'GM Transportadora | Ger. Logística' },
-                { id: '7', name: 'Jeniffer dos Santos Luz', type: 'GM Transportadora | Téc. Segurança' },
-                { id: '8', name: 'Laurenise Araujo Ferreira', type: 'GM Transportadora | Téc. Segurança' },
-              ]?.map((user) => (
-                <tr key={user.id} className="bg-white hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-700">{user.name}</span>
-                      <span className="text-xs text-slate-400">{user.type}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <TableToggle
-                      active={selectedUsers.includes(user.id)}
-                      onChange={(val) => {
-                        if (val) setSelectedUsers(prev => [...prev, user.id]);
-                        else setSelectedUsers(prev => prev.filter(uid => uid !== user.id));
-                      }}
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-center"><TableToggle active={user.id === '1'} onChange={() => { }} /></td>
-                  <td className="px-6 py-4 text-center"><TableToggle active={false} onChange={() => { }} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="max-w-7xl w-full mx-auto p-8 h-[calc(100vh-200px)]">
+        <ChecklistUsers checklistId={checklistId} onEnsureExists={() => performSave(true)} />
       </div>
     );
   }

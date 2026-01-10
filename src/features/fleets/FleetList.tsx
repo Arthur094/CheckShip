@@ -9,34 +9,55 @@ import {
     Trash2,
     Ban
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface FleetVehicle {
     id: string;
     plate: string;
     model: string;
-    type: string;
-    status: 'Ativo' | 'Inativo';
+    vehicle_types?: {
+        name: string;
+    } | null;
+    active: boolean;
 }
 
 interface FleetListProps {
     onNew: () => void;
-    onEdit: (vehicle: FleetVehicle) => void;
+    onEdit: (vehicle: any) => void;
 }
 
 const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
+    const [loading, setLoading] = useState(true);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Mock data
-    const vehicles: FleetVehicle[] = [
-        { id: '1', plate: 'ABC-1234', model: 'Scania R450', type: 'Cavalo Mecânico', status: 'Ativo' },
-        { id: '2', plate: 'XYZ-9876', model: 'Volvo FH540', type: 'Cavalo Mecânico', status: 'Ativo' },
-        { id: '3', plate: 'DEF-5678', model: 'Randert Carreta', type: 'Carreta Baú', status: 'Inativo' },
-        { id: '4', plate: 'GHI-9012', model: 'Mercedes Actros', type: 'Truck', status: 'Ativo' },
-        { id: '5', plate: 'JKL-3456', model: 'VW Delivery', type: 'VUC', status: 'Ativo' },
-        { id: '6', plate: 'MNO-7890', model: 'Facchini Sider', type: 'Carreta Sider', status: 'Ativo' },
-    ];
+    const fetchVehicles = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('vehicles')
+                .select(`
+                    *,
+                    vehicle_types (
+                        name
+                    )
+                `)
+                .order('plate');
+
+            if (error) throw error;
+            setVehicles(data || []);
+        } catch (error: any) {
+            console.error('Error fetching vehicles:', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchVehicles();
+    }, []);
 
     const filteredVehicles = vehicles.filter(v =>
         v.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -107,66 +128,77 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
 
                     {/* Table Rows */}
                     <div className="divide-y divide-slate-100">
-                        {filteredVehicles.map((vehicle) => (
-                            <div
-                                key={vehicle.id}
-                                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors group relative"
-                            >
-                                <div className="col-span-3 text-sm font-bold text-slate-700">
-                                    {vehicle.plate}
-                                </div>
-                                <div className="col-span-3 text-sm text-slate-600">
-                                    {vehicle.model}
-                                </div>
-                                <div className="col-span-3 text-sm text-slate-600">
-                                    {vehicle.type}
-                                </div>
-                                <div className="col-span-3 flex items-center justify-between">
-                                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${vehicle.status === 'Ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                        {vehicle.status}
-                                    </span>
+                        {loading ? (
+                            <div className="p-12 text-center text-slate-400">
+                                <div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full mb-2"></div>
+                                <p className="text-sm">Carregando veículos...</p>
+                            </div>
+                        ) : filteredVehicles.length === 0 ? (
+                            <div className="p-12 text-center text-slate-400">
+                                <p className="text-sm">Nenhum veículo encontrado.</p>
+                            </div>
+                        ) : (
+                            filteredVehicles.map((vehicle) => (
+                                <div
+                                    key={vehicle.id}
+                                    className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors group relative"
+                                >
+                                    <div className="col-span-3 text-sm font-bold text-slate-700">
+                                        {vehicle.plate}
+                                    </div>
+                                    <div className="col-span-3 text-sm text-slate-600">
+                                        {vehicle.model}
+                                    </div>
+                                    <div className="col-span-3 text-sm text-slate-600">
+                                        {vehicle.vehicle_types?.name || 'Não definido'}
+                                    </div>
+                                    <div className="col-span-3 flex items-center justify-between">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${vehicle.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {vehicle.active ? 'Ativo' : 'Inativo'}
+                                        </span>
 
-                                    {/* Hover Actions */}
-                                    <div className={`flex items-center gap-2 ${activeMenu === vehicle.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                                        <button
-                                            onClick={() => onEdit(vehicle)}
-                                            className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-blue-900 transition-colors"
-                                            title="Editar"
-                                        >
-                                            <Pencil size={18} />
-                                        </button>
-                                        <div className="relative">
+                                        {/* Hover Actions */}
+                                        <div className={`flex items-center gap-2 ${activeMenu === vehicle.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                                             <button
-                                                onClick={(e) => toggleMenu(e, vehicle.id)}
-                                                className={`p-2 rounded-full transition-colors ${activeMenu === vehicle.id ? 'bg-slate-200 text-slate-700' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-700'}`}
+                                                onClick={() => onEdit(vehicle)}
+                                                className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-blue-900 transition-colors"
+                                                title="Editar"
                                             >
-                                                <MoreVertical size={18} />
+                                                <Pencil size={18} />
                                             </button>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => toggleMenu(e, vehicle.id)}
+                                                    className={`p-2 rounded-full transition-colors ${activeMenu === vehicle.id ? 'bg-slate-200 text-slate-700' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-700'}`}
+                                                >
+                                                    <MoreVertical size={18} />
+                                                </button>
 
-                                            {/* Dropdown Menu */}
-                                            {activeMenu === vehicle.id && (
-                                                <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
-                                                    <button
-                                                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                                        onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                        Excluir
-                                                    </button>
-                                                    <button
-                                                        className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                                        onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
-                                                    >
-                                                        <Ban size={16} />
-                                                        Desativar
-                                                    </button>
-                                                </div>
-                                            )}
+                                                {/* Dropdown Menu */}
+                                                {activeMenu === vehicle.id && (
+                                                    <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
+                                                        <button
+                                                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                            onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                            Excluir
+                                                        </button>
+                                                        <button
+                                                            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                                            onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
+                                                        >
+                                                            <Ban size={16} />
+                                                            Desativar
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

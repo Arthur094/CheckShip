@@ -1,20 +1,21 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Plus,
     Search,
     Filter,
     MoreVertical,
-    Pencil
+    Pencil,
+    User as UserIcon
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface User {
     id: string;
-    name: string;
-    type: string;
+    full_name: string;
+    role: string;
     email: string;
-    initials: string;
-    bgColor: string;
+    active: boolean;
 }
 
 interface UserListProps {
@@ -24,23 +25,44 @@ interface UserListProps {
 
 const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Mock data
-    const users: User[] = [
-        { id: '1', name: 'Admin', type: 'Administrador', email: 'arthur.sousa@nativa.inf.br', initials: 'AA', bgColor: 'bg-emerald-500' },
-        { id: '2', name: 'Arthur Matos Sousa', type: 'GM Transportadora | Logística', email: 'ArthurTeste', initials: 'AS', bgColor: 'bg-cyan-500' },
-        { id: '3', name: 'Carolina Almeida', type: 'GM | Recursos Humanos', email: 'gestaodepessoas@grupomagnolia.com.br', initials: 'CA', bgColor: 'bg-emerald-500' },
-        { id: '4', name: 'Diego Rodrigues', type: 'GM Transportadora | Manutenção', email: 'manutencaorolim@grupomagnolia.com.br', initials: 'DR', bgColor: 'bg-cyan-500' },
-        { id: '5', name: 'Fagner Frazão', type: 'GM | TI', email: 'fagnerfrazao@grupomagnolia.com.br', initials: 'FF', bgColor: 'bg-cyan-500' },
-        { id: '6', name: 'Fernando Rolim', type: 'GM Transportadora | Ger. Logística', email: 'fernandorolim@grupomagnolia.com.br', initials: 'FR', bgColor: 'bg-cyan-500' },
-        { id: '7', name: 'Jeniffer dos Santos Luz', type: 'GM Transportadora | Téc. Segurança', email: 'ssmaq@grupomagnolia.com.br', initials: 'JL', bgColor: 'bg-cyan-500' },
-        { id: '8', name: 'Laurenise Araujo Ferreira', type: 'GM Transportadora | Téc. Segurança', email: 'laurenise@grupomagnolia.com.br', initials: 'LF', bgColor: 'bg-cyan-500' },
-    ];
+    const fetchUsers = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('full_name');
+
+            if (error) throw error;
+            setUsers(data || []);
+        } catch (error: any) {
+            console.error('Error fetching users:', error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
     const filteredUsers = users.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
+        (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || '')
     );
+
+    const getInitials = (name: string) => {
+        if (!name) return '??';
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase();
+    };
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
@@ -64,7 +86,7 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                     <Search size={20} className="absolute left-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar"
+                        placeholder="Buscar por nome ou e-mail..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-12 py-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all placeholder:text-slate-400 bg-slate-50"
@@ -81,54 +103,69 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                     {/* Table Header */}
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
                         <div className="col-span-4 flex items-center gap-2">
-                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-900 focus:ring-blue-900" />
                             Nome
                         </div>
-                        <div className="col-span-4">Tipo de usuário</div>
-                        <div className="col-span-4">Nome de usuário</div>
+                        <div className="col-span-3">Cargo</div>
+                        <div className="col-span-3">E-mail</div>
+                        <div className="col-span-2 text-right">Status</div>
                     </div>
 
                     {/* Table Rows */}
                     <div className="divide-y divide-slate-100">
-                        {filteredUsers.map((user) => (
-                            <div
-                                key={user.id}
-                                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors group"
-                            >
-                                <div className="col-span-4 flex items-center gap-4">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-900 focus:ring-blue-900"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <div className={`w-8 h-8 rounded-full ${user.bgColor} flex items-center justify-center text-white text-xs font-bold tracking-wide`}>
-                                        {user.initials}
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">{user.name}</span>
-                                </div>
-
-                                <div className="col-span-4 text-sm text-slate-600">
-                                    {user.type}
-                                </div>
-
-                                <div className="col-span-4 text-sm text-slate-600 flex items-center justify-between">
-                                    {user.email}
-                                    {/* Hover Actions */}
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                                        <button
-                                            onClick={() => onEdit(user)}
-                                            className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-blue-900 transition-colors"
-                                            title="Editar"
-                                        >
-                                            <Pencil size={18} />
-                                        </button>
-                                        <button className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700">
-                                            <MoreVertical size={18} />
-                                        </button>
-                                    </div>
-                                </div>
+                        {loading ? (
+                            <div className="p-12 text-center text-slate-400">
+                                <div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full mb-2"></div>
+                                <p className="text-sm">Carregando usuários...</p>
                             </div>
-                        ))}
+                        ) : filteredUsers.length === 0 ? (
+                            <div className="p-12 text-center text-slate-400">
+                                <p className="text-sm">Nenhum usuário encontrado.</p>
+                            </div>
+                        ) : (
+                            filteredUsers.map((user) => (
+                                <div
+                                    key={user.id}
+                                    className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors group"
+                                >
+                                    <div className="col-span-4 flex items-center gap-4">
+                                        <div className={`w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 text-xs font-bold tracking-wide`}>
+                                            {getInitials(user.full_name)}
+                                        </div>
+                                        <span className="text-sm font-medium text-slate-700">{user.full_name || 'Sem Nome'}</span>
+                                    </div>
+
+                                    <div className="col-span-3 text-sm text-slate-600">
+                                        <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                            {user.role}
+                                        </span>
+                                    </div>
+
+                                    <div className="col-span-3 text-sm text-slate-600 truncate">
+                                        {user.email}
+                                    </div>
+
+                                    <div className="col-span-2 flex items-center justify-end gap-3 text-right">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${user.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {user.active ? 'Ativo' : 'Inativo'}
+                                        </span>
+
+                                        {/* Hover Actions */}
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                            <button
+                                                onClick={() => onEdit(user)}
+                                                className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-blue-900 transition-colors"
+                                                title="Editar"
+                                            >
+                                                <Pencil size={16} />
+                                            </button>
+                                            <button className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700">
+                                                <MoreVertical size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

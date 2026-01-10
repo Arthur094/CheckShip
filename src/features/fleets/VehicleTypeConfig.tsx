@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import VehicleTypeForm from './VehicleTypeForm';
 import VehicleTypeUnits from './VehicleTypeUnits';
 import VehicleTypeChecklists from './VehicleTypeChecklists';
+import { supabase } from '../../lib/supabase';
 
 interface VehicleTypeConfigProps {
     onBack: () => void;
@@ -12,18 +13,86 @@ interface VehicleTypeConfigProps {
 
 const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialData }) => {
     const [activeTab, setActiveTab] = useState('profile');
-    const isNew = !initialData;
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        id: initialData?.id || null,
+        name: initialData?.name || '',
+        description: initialData?.description || ''
+    });
+
+    const isNew = !formData.id;
+
+    useEffect(() => {
+        if (initialData) {
+            setFormData({
+                id: initialData.id,
+                name: initialData.name || '',
+                description: initialData.description || ''
+            });
+        }
+    }, [initialData]);
+
+    const handleFieldChange = (field: string, value: string) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const performSave = async (silent = false): Promise<boolean> => {
+        if (!formData.name.trim()) {
+            if (!silent) alert('O nome do tipo de veículo é obrigatório.');
+            return false;
+        }
+
+        try {
+            if (!silent) setLoading(true);
+
+            const payload = {
+                id: formData.id || undefined,
+                name: formData.name,
+                description: formData.description
+            };
+
+            const { data, error } = await supabase
+                .from('vehicle_types')
+                .upsert(payload)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                setFormData(prev => ({ ...prev, id: data.id }));
+            }
+
+            if (!silent) {
+                alert('Tipo de veículo salvo com sucesso!');
+                if (isNew) {
+                    // Update current view to not new mode if staying, or if strict navigation, back.
+                    // Here we originally went back.
+                    onBack();
+                }
+            }
+            return true;
+        } catch (error: any) {
+            console.error('Error saving vehicle type:', error.message);
+            if (!silent) alert('Erro ao salvar: ' + error.message);
+            return false;
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    };
+
+    const handleSave = () => performSave(false);
 
     const renderContent = () => {
         switch (activeTab) {
             case 'profile':
-                return <VehicleTypeForm />;
+                return <VehicleTypeForm data={formData} onChange={handleFieldChange} />;
             case 'units':
                 return <VehicleTypeUnits />;
             case 'checklists':
-                return <VehicleTypeChecklists />;
+                return <VehicleTypeChecklists vehicleTypeId={formData.id} onEnsureExists={() => performSave(true)} />;
             default:
-                return <VehicleTypeForm />;
+                return <VehicleTypeForm data={formData} onChange={handleFieldChange} />;
         }
     };
 
@@ -37,7 +106,7 @@ const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialDa
                             <ArrowLeft size={24} />
                         </button>
                         <h1 className="text-xl font-bold text-blue-900">
-                            {isNew ? 'Novo Tipo de Veículo' : initialData.name}
+                            {isNew ? 'Novo Tipo de Veículo' : formData.name}
                         </h1>
                     </div>
                     <div className="text-xs text-slate-400 ml-10">
@@ -82,8 +151,12 @@ const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialDa
                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                     </label>
                 </div>
-                <button className="bg-blue-900 text-white px-8 py-2.5 rounded text-sm font-bold shadow-sm hover:bg-blue-800 transition-colors">
-                    SALVAR
+                <button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="bg-blue-900 text-white px-8 py-2.5 rounded text-sm font-bold shadow-sm hover:bg-blue-800 transition-colors disabled:opacity-50"
+                >
+                    {loading ? 'SALVANDO...' : 'SALVAR'}
                 </button>
             </div>
         </div>

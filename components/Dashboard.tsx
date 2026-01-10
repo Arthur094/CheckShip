@@ -1,25 +1,26 @@
-
-import React from 'react';
-import { 
-  CheckCircle2, 
-  AlertTriangle, 
-  ClipboardList, 
-  TrendingUp, 
-  Truck, 
-  Clock 
+import React, { useState } from 'react';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  ClipboardList,
+  TrendingUp,
+  Truck,
+  Clock
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  LineChart, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
   Line,
   Cell
 } from 'recharts';
+import StartInspectionModal from '../src/features/inspections/StartInspectionModal';
+import InspectionForm from '../src/features/inspections/InspectionForm';
 
 const data = [
   { name: 'Seg', checklists: 45, conformidade: 92 },
@@ -38,14 +39,44 @@ const maintenanceStatus = [
 ];
 
 const Dashboard: React.FC = () => {
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [activeInspection, setActiveInspection] = useState<{ checklistId: string, vehicleId: string } | null>(null);
+
+  if (activeInspection) {
+    return <InspectionForm
+      checklistId={activeInspection.checklistId}
+      vehicleId={activeInspection.vehicleId}
+      onClose={() => setActiveInspection(null)}
+    />;
+  }
+
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
+      {showInspectionModal && (
+        <StartInspectionModal
+          onClose={() => setShowInspectionModal(false)}
+          onStart={(checklistId, vehicleId) => {
+            setShowInspectionModal(false);
+            setActiveInspection({ checklistId, vehicleId });
+          }}
+        />
+      )}
       <header>
         <h1 className="text-2xl font-bold text-slate-800">Dashboard Operacional</h1>
         <p className="text-slate-500">Visão geral da frota e conformidade de inspeções.</p>
       </header>
 
       {/* Top Cards */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowInspectionModal(true)}
+          className="bg-blue-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-800 shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center gap-2 uppercase tracking-widest"
+        >
+          <ClipboardList size={18} />
+          Iniciar Inspeção
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group hover:border-blue-200 transition-colors cursor-default">
           <div>
@@ -98,10 +129,10 @@ const Dashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                <Tooltip 
-                  cursor={{fill: '#f8fafc'}}
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <Tooltip
+                  cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
                 <Bar dataKey="checklists" fill="#1e3a8a" radius={[6, 6, 0, 0]} barSize={40} />
@@ -123,9 +154,9 @@ const Dashboard: React.FC = () => {
                   <span className="font-bold text-slate-800">{item.value}%</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full rounded-full transition-all duration-1000" 
-                    style={{ width: `${item.value}%`, backgroundColor: item.color }} 
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${item.value}%`, backgroundColor: item.color }}
                   />
                 </div>
               </div>
@@ -175,10 +206,9 @@ const Dashboard: React.FC = () => {
                   <td className="px-6 py-4 text-sm text-slate-600 font-medium">{row.driver}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{row.event}</td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${
-                      row.status === 'CRITICO' ? 'bg-red-100 text-red-700' :
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${row.status === 'CRITICO' ? 'bg-red-100 text-red-700' :
                       row.status === 'MANUTENÇÃO' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                    }`}>
+                      }`}>
                       {row.status}
                     </span>
                   </td>
