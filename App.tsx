@@ -17,6 +17,10 @@ import StartInspectionModal from './src/features/inspections/StartInspectionModa
 import InspectionForm from './src/features/inspections/InspectionForm';
 import InspectionDetails from './src/features/inspections/InspectionDetails';
 
+// Mobile Imports
+import MobileLayout from './src/components/mobile/MobileLayout';
+
+
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
