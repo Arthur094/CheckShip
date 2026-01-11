@@ -15,6 +15,7 @@ import { HelpCircle, Bell, Search as SearchIcon } from 'lucide-react';
 
 import StartInspectionModal from './src/features/inspections/StartInspectionModal';
 import InspectionForm from './src/features/inspections/InspectionForm';
+import InspectionDetails from './src/features/inspections/InspectionDetails';
 
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -160,6 +161,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/dashboard" element={<MainLayout />} />
+        <Route path="/inspections/:id" element={<InspectionDetails />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>

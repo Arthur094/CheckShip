@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, Trash2, Check, X, Camera, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Search, Filter, Download, Trash2, CheckCircle2, Eye, AlertTriangle, FileText, MoreVertical } from 'lucide-react';
 import { supabase } from '../src/lib/supabase';
-import { ChecklistStatus } from '../types';
+import { useNavigate } from 'react-router-dom';
+import ExportModal from './ExportModal';
 
 interface HistoryItem {
   id: string;
@@ -13,14 +14,15 @@ interface HistoryItem {
   vehicle: {
     plate: string;
     model: string;
-    type?: string; // Fallback
+    type?: string;
     vehicle_types?: { name: string }
   } | null;
   template: { name: string } | null;
-  critical_count?: number; // Calculated or from answers
+  critical_count?: number;
 }
 
 const ChecklistHistory: React.FC = () => {
+  const navigate = useNavigate();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
@@ -32,14 +34,14 @@ const ChecklistHistory: React.FC = () => {
     endDate: ''
   });
 
+  // Action States
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      // Joins: 
-      // - vehicles (plate, model) -> vehicle_types (name)
-      // - checklist_templates (name)
-      // - profiles (full_name) [Linked via user_id]
-
       const { data, error } = await supabase
         .from('checklist_inspections')
         .select(`
@@ -58,15 +60,10 @@ const ChecklistHistory: React.FC = () => {
         `)
         .order('started_at', { ascending: false });
 
-      console.log('Dados recebidos:', data, error);
-
       if (error) throw error;
 
-      console.log('History Data:', data);
-
-      // Post-process for complex filters (Partial Match on related fields)
+      // Post-process for issues count and filters
       const processed = (data || []).map((item: any) => {
-        // Count critical issues (example logic: 'nao_conforme' in answers)
         let issues = 0;
         if (item.answers) {
           Object.values(item.answers).forEach((ans: any) => {
@@ -85,9 +82,10 @@ const ChecklistHistory: React.FC = () => {
           critical_count: issues
         };
       }).filter(item => {
-        // Client-side filtering for related fields
         if (filters.plate && !item.vehicle?.plate.toLowerCase().includes(filters.plate.toLowerCase())) return false;
         if (filters.driver && !item.user?.full_name.toLowerCase().includes(filters.driver.toLowerCase())) return false;
+        // Status filter handled here for simplicity if select didn't filter in query
+        if (filters.status && filters.status !== 'all' && item.status !== filters.status) return false;
         return true;
       });
 
@@ -102,26 +100,40 @@ const ChecklistHistory: React.FC = () => {
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [filters]);
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
 
-  const applyFilters = () => {
-    fetchHistory();
-  };
-
   const clearFilters = () => {
     setFilters({ plate: '', driver: '', status: '', startDate: '', endDate: '' });
-    // fetchHistory() will be called next render if we adding dependency or just call it manually
-    // But better to just let user click Filter or trigger it.
-    // For now, let's trigger it.
-    setTimeout(fetchHistory, 100);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este registro de inspeção?')) {
+      try {
+        const { error } = await supabase.from('checklist_inspections').delete().eq('id', id);
+        if (error) throw error;
+
+        // Immediate Frontend Update
+        setHistory(prev => prev.filter(item => item.id !== id));
+        setActiveMenuId(null);
+
+      } catch (err: any) {
+        alert('Erro ao excluir: ' + err.message);
+      }
+    }
+  };
+
+  const handleOpenExport = (id: string) => {
+    setSelectedInspectionId(id);
+    setShowExportModal(true);
+    setActiveMenuId(null);
   };
 
   return (
-    <div className="p-8 space-y-6 animate-in slide-in-from-right duration-300">
+    <div className="p-8 space-y-6 animate-in slide-in-from-right duration-300" onClick={() => setActiveMenuId(null)}>
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Checklists Realizados</h1>
@@ -129,22 +141,18 @@ const ChecklistHistory: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={(e) => { e.stopPropagation(); setShowFilters(!showFilters); }}
             className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
           >
             <Filter size={18} />
             {showFilters ? 'Esconder Filtros' : 'Mostrar Filtros'}
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-900 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-800 transition-colors">
-            <Download size={18} />
-            GERAR RELATÓRIO PDF
           </button>
         </div>
       </header>
 
       {/* Filters Section */}
       {showFilters && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in zoom-in duration-200">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase">Placa do Veículo</label>
             <input
@@ -165,7 +173,6 @@ const ChecklistHistory: React.FC = () => {
               onChange={(e) => handleFilterChange('driver', e.target.value)}
             />
           </div>
-          {/* Status Filter */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase">Status</label>
             <select
@@ -187,7 +194,7 @@ const ChecklistHistory: React.FC = () => {
               LIMPAR
             </button>
             <button
-              onClick={applyFilters}
+              onClick={() => fetchHistory()}
               className="flex-1 bg-blue-900 hover:bg-blue-800 text-white font-bold py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
             >
               <Search size={16} />
@@ -198,11 +205,11 @@ const ChecklistHistory: React.FC = () => {
       )}
 
       {/* History Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-visible min-h-[400px]">
+        <div className="overflow-visible">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+              <tr className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider border-b border-slate-100">
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Código</th>
                 <th className="px-6 py-4">Tipo Veículo</th>
@@ -230,14 +237,14 @@ const ChecklistHistory: React.FC = () => {
                 </tr>
               ) : (
                 history.map((row) => (
-                  <tr key={row.id} className="hover:bg-blue-50/30 transition-colors group">
+                  <tr key={row.id} className="hover:bg-blue-50/30 transition-colors group relative">
                     {/* Status */}
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${row.status === 'completed' || row.status === 'Aprovado' ? 'bg-green-100 text-green-700' :
-                        row.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                          'bg-slate-100 text-slate-600'
+                          row.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                            'bg-slate-100 text-slate-600'
                         }`}>
-                        {row.status === 'completed' ? 'Finalizado' : row.status === 'in_progress' ? 'Em Andamento' : row.status}
+                        {row.status === 'completed' ? 'Finalizado' : row.status}
                       </span>
                     </td>
 
@@ -295,14 +302,51 @@ const ChecklistHistory: React.FC = () => {
                     </td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 text-slate-400 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all" title="Ver Detalhes">
+                    <td className="px-6 py-4 text-right relative">
+                      <div className="flex justify-end gap-2 items-center">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOpenExport(row.id); }}
+                          className="p-2 text-slate-400 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Exportar"
+                        >
+                          <FileText size={18} />
+                        </button>
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/inspections/${row.id}`); }}
+                          className="p-2 text-slate-400 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Ver Detalhes"
+                        >
                           <Eye size={18} />
                         </button>
-                        <button className="p-2 text-slate-400 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all" title="Ver Evidências">
-                          <Camera size={18} />
-                        </button>
+
+                        {/* Dropdown Trigger */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === row.id ? null : row.id);
+                            }}
+                            className={`p-2 rounded-lg transition-all ${activeMenuId === row.id ? 'bg-slate-100 text-blue-900' : 'text-slate-400 hover:text-blue-900 hover:bg-blue-50'}`}
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {activeMenuId === row.id && (
+                            <div className="absolute right-0 top-10 w-40 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2 animate-in zoom-in-95 duration-200 header-dropdown">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(row.id);
+                                }}
+                                className="w-full text-left px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                              >
+                                <Trash2 size={16} /> Excluir Registro
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -312,6 +356,12 @@ const ChecklistHistory: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        inspectionId={selectedInspectionId || ''}
+      />
     </div>
   );
 };
