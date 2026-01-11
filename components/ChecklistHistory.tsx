@@ -48,7 +48,11 @@ const ChecklistHistory: React.FC = () => {
           started_at,
           completed_at,
           answers,
-          vehicle:vehicles!vehicle_id (plate, model, type, vehicle_types!vehicle_type_id(name)),
+          vehicle:vehicles!vehicle_id (
+            plate,
+            model,
+            vehicle_types!vehicle_type_id (name)
+          ),
           template:checklist_templates!checklist_template_id (name),
           user:profiles!inspector_id (full_name)
         `)
