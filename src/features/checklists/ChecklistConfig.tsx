@@ -273,9 +273,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         }
       }
 
-      // Handle temp ID
-      const isTempId = checklistId.startsWith('chk_');
-      const idToSend = isTempId ? undefined : checklistId;
+      // Always send the ID, even if temp (assuming DB accepts text or we rely on client-gen ID)
+      const idToSend = checklistId;
 
       const checklistData: Partial<ChecklistTemplate> = {
         id: idToSend,
@@ -286,11 +285,11 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
           ...settings
         },
         structure: {
-          areas: areas.map(area => ({
+          areas: areas?.map(area => ({
             id: area.id,
             name: area.name,
             type: 'Padrão',
-            items: area.items.map(item => ({
+            items: area.items?.map(item => ({
               id: item.id,
               name: item.name,
               type: item.type as ItemType,
@@ -298,13 +297,17 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               config: {
                 hint: item.config?.hint,
                 scale_type: item.scaleType as any,
-                selection_options: item.config?.selectionOptions || []
+                numeric_option: item.config?.numericOption,
+                registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined, // Simplify for DB if needed or keep raw
+                selection_type: item.config?.selectionType,
+                selection_options: item.config?.selectionOptions || (item.config as any)?.options || [],
+                options: item.config?.selectionOptions || (item.config as any)?.options || [] // Mirror for safety
               }
-            })),
-            sub_areas: area.subAreas.map(sub => ({
+            })) || [],
+            sub_areas: area.subAreas?.map(sub => ({
               id: sub.id,
               name: sub.name,
-              items: sub.items.map(sitem => ({
+              items: sub.items?.map(sitem => ({
                 id: sitem.id,
                 name: sitem.name,
                 type: sitem.type as ItemType,
@@ -312,11 +315,15 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 config: {
                   hint: sitem.config?.hint,
                   scale_type: sitem.scaleType as any,
-                  selection_options: sitem.config?.selectionOptions || []
+                  numeric_option: sitem.config?.numericOption,
+                  registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
+                  selection_type: sitem.config?.selectionType,
+                  selection_options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [],
+                  options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [] // Mirror for safety
                 }
-              }))
-            }))
-          }))
+              })) || []
+            })) || []
+          })) || []
         },
         target_vehicle_types: selectedVehicleTypes as any,
         assigned_user_ids: selectedUsers,
@@ -436,7 +443,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         setRegistryOptions(item.config.registryOptions || []);
         setNumericOption(item.config.numericOption || '');
         setSelectionType(item.config.selectionType || 'single');
-        setSelectionOptions(item.config.selectionOptions || []);
+        // Robust fallback for options loading
+        setSelectionOptions(item.config.selectionOptions || item.config.options || (item as any).options || []);
         setHintText(item.config.hint || '');
         setShowHint(!!item.config.hint);
       }
@@ -455,6 +463,13 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     if (!itemName || !openItemFormLocation) return;
 
     const { areaIdx, subAreaIdx } = openItemFormLocation;
+
+    // Handle any pending option that wasn't strictly added via button
+    let finalSelectionOptions = [...selectionOptions];
+    if (itemType === 'Lista de Seleção' && newOptionText && newOptionText.trim().length > 0) {
+      finalSelectionOptions.push(newOptionText.trim());
+      setNewOptionText(''); // Clear input
+    }
 
     // Determine existing ID or generate new one
     let existingId: string | undefined;
@@ -476,7 +491,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         registryOptions,
         numericOption,
         selectionType,
-        selectionOptions,
+        selectionOptions: finalSelectionOptions,
         hint: hintText
       }
     };

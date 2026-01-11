@@ -39,8 +39,29 @@ const ChecklistList: React.FC<ChecklistListProps> = ({ onNew, onEdit }) => {
     t.subject?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este checklist?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('checklist_templates')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTemplates(prev => prev.filter(t => t.id !== id));
+      setActiveMenuId(null);
+    } catch (error: any) {
+      console.error('Error deleting template:', error.message);
+      alert('Erro ao excluir: ' + error.message);
+    }
+  };
+
   return (
-    <div className="p-8 space-y-6 animate-in fade-in duration-500">
+    <div className="p-8 space-y-6 animate-in fade-in duration-500" onClick={() => setActiveMenuId(null)}>
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Checklists</h1>
         <button
@@ -111,10 +132,29 @@ const ChecklistList: React.FC<ChecklistListProps> = ({ onNew, onEdit }) => {
                       minute: '2-digit'
                     })}
                   </td>
-                  <td className="px-6 py-4 text-slate-400">
-                    <button className="p-1 hover:bg-slate-100 rounded-md transition-all">
+                  <td className="px-6 py-4 text-slate-400 relative">
+                    <button
+                      className="p-1 hover:bg-slate-100 rounded-md transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === template.id ? null : template.id);
+                      }}
+                    >
                       <MoreVertical size={16} className="cursor-pointer hover:text-blue-900" />
                     </button>
+                    {activeMenuId === template.id && (
+                      <div className="absolute right-8 top-8 bg-white border border-slate-200 rounded-lg shadow-xl py-2 w-32 z-10 animate-in fade-in zoom-in-95 duration-200">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(template.id);
+                          }}
+                          className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
