@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { HashRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { HashRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { supabase } from './lib/supabase';
 import LoginScreen from './components/screens/LoginScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import VehicleSelectScreen from './components/screens/VehicleSelectScreen';
@@ -8,21 +9,24 @@ import InspectionScreen from './components/screens/InspectionScreen';
 import CompletedScreen from './components/screens/CompletedScreen';
 import ProfileScreen from './components/screens/ProfileScreen';
 
-// Simple Auth Context mock
-const AuthContext = React.createContext<{
-  isAuthenticated: boolean;
-  login: () => void;
+const AuthContext = createContext<{
+  session: any | null;
+  loading: boolean;
   logout: () => void;
 }>({
-  isAuthenticated: false,
-  login: () => { },
+  session: null,
+  loading: true,
   logout: () => { },
 });
 
 const AppRoutes = () => {
-  const { isAuthenticated } = React.useContext(AuthContext);
+  const { session, loading } = useContext(AuthContext);
 
-  if (!isAuthenticated) {
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
+  }
+
+  if (!session) {
     return (
       <Routes>
         <Route path="*" element={<LoginScreen />} />
@@ -44,13 +48,29 @@ const AppRoutes = () => {
 };
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = () => setIsAuthenticated(true);
-  const logout = () => setIsAuthenticated(false);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ session, loading, logout }}>
       <HashRouter>
         <AppRoutes />
       </HashRouter>
@@ -58,4 +78,4 @@ export default function App() {
   );
 }
 
-export const useAuth = () => React.useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext);
