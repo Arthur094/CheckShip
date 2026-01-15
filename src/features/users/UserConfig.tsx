@@ -57,11 +57,10 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
         try {
             if (!silent) setLoading(true);
 
-            // Manual mapping to snake_case for Supabase
-            // Note: For new users, we generate a temporary UUID if it's a test case, 
-            // but normally it comes from auth.users.
+            // Bypass: Inserção direta na tabela profiles
+            // O usuário deve criar a conta Auth manualmente no painel Supabase
             const payload = {
-                id: stableId, // Use the stable ID
+                id: stableId, // UUID gerado ou existente
                 full_name: formData.full_name,
                 email: formData.email,
                 role: formData.role,
@@ -77,7 +76,7 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
 
             if (error) throw error;
 
-            if (!silent) alert('Usuário salvo com sucesso!');
+            if (!silent) alert('Usuário salvo (Perfil criado/atualizado). Lembre-se de criar o Auth manualmente.');
             return true;
         } catch (error: any) {
             console.error('Error saving user:', error.message);

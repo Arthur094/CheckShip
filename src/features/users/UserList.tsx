@@ -36,6 +36,9 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                 .select('*')
                 .order('full_name');
 
+            console.log('Fetched users:', data);
+            console.log('Fetch error:', error);
+
             if (error) throw error;
             setUsers(data || []);
         } catch (error: any) {
@@ -62,6 +65,26 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
             .slice(0, 2)
             .join('')
             .toUpperCase();
+    };
+
+    const handleDelete = async (user: User) => {
+        if (confirm(`Tem certeza que gostaria de excluir este usuário? (${user.full_name})`)) {
+            try {
+                setLoading(true);
+                const { error } = await supabase.functions.invoke('admin-delete-user', {
+                    body: { user_id: user.id }
+                });
+
+                if (error) throw error;
+
+                alert('Usuário excluído com sucesso.');
+                fetchUsers();
+            } catch (error: any) {
+                console.error('Erro ao excluir usuário:', error);
+                alert('Erro ao excluir usuário: ' + error.message);
+                setLoading(false);
+            }
+        }
     };
 
     return (
@@ -158,8 +181,13 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                                             >
                                                 <Pencil size={16} />
                                             </button>
-                                            <button className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700">
-                                                <MoreVertical size={16} />
+                                            <button
+                                                onClick={() => handleDelete(user)}
+                                                className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-red-600 transition-colors"
+                                                title="Excluir"
+                                            >
+                                                <MoreVertical size={16} className="hidden" /> {/* Mantendo alinhamento se necessário, ou usar Trash */}
+                                                <span className="material-symbols-outlined text-[18px]">delete</span>
                                             </button>
                                         </div>
                                     </div>

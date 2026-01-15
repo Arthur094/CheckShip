@@ -23,6 +23,17 @@ export const driverService = {
         return data.map((item: any) => item.vehicles);
     },
 
+    async getVehicleDetail(vehicleId: string) {
+        const { data, error } = await supabase
+            .from('vehicles')
+            .select('id, plate, model, brand')
+            .eq('id', vehicleId)
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
     // 2. Busca templates do veículo (A FUNÇÃO QUE ESTAVA FALTANDO)
     async getAvailableTemplates(vehicleId: string) {
         const { data, error } = await supabase

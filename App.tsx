@@ -17,8 +17,7 @@ import StartInspectionModal from './src/features/inspections/StartInspectionModa
 import InspectionForm from './src/features/inspections/InspectionForm';
 import InspectionDetails from './src/features/inspections/InspectionDetails';
 
-// Mobile Imports
-import MobileLayout from './src/components/mobile/MobileLayout';
+
 
 
 const MainLayout: React.FC = () => {
@@ -159,16 +158,22 @@ const MainLayout: React.FC = () => {
   );
 };
 
+import { useAuth, AuthProvider } from './src/hooks/useAuth';
+
+// ... existing code ...
+
 const App: React.FC = () => {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/dashboard" element={<MainLayout />} />
-        <Route path="/inspections/:id" element={<InspectionDetails />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/dashboard" element={<MainLayout />} />
+          <Route path="/inspections/:id" element={<InspectionDetails />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 };
 

@@ -6,23 +6,28 @@ const TemplateSelectScreen: React.FC = () => {
   const navigate = useNavigate();
   const { vehicleId } = useParams();
   const [templates, setTemplates] = useState<any[]>([]);
+  const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    async function loadTemplates() {
+    async function loadData() {
       if (!vehicleId) return;
       setLoading(true);
       try {
-        const data = await driverService.getAvailableTemplates(vehicleId);
-        setTemplates(data || []);
+        const [templatesData, vehicleData] = await Promise.all([
+          driverService.getAvailableTemplates(vehicleId),
+          driverService.getVehicleDetail(vehicleId)
+        ]);
+        setTemplates(templatesData || []);
+        setVehicle(vehicleData);
       } catch (error) {
-        console.error('Erro ao carregar templates:', error);
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
       }
     }
-    loadTemplates();
+    loadData();
   }, [vehicleId]);
 
   const filteredTemplates = templates.filter(t =>
@@ -50,7 +55,9 @@ const TemplateSelectScreen: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Veículo Selecionado</p>
-                <h3 className="text-slate-900 text-lg font-bold leading-tight">ID: {vehicleId?.substring(0, 8)}...</h3>
+                <h3 className="text-slate-900 text-lg font-bold leading-tight">
+                  {vehicle ? `${vehicle.plate} - ${vehicle.model}` : `ID: ${vehicleId?.substring(0, 8)}...`}
+                </h3>
               </div>
             </div>
           </div>

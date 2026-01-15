@@ -9,11 +9,15 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
-      login();
-      navigate('/mobile/dashboard');
+      try {
+        await login(email, password);
+        navigate('/dashboard'); // Adjusted path based on App.tsx routes
+      } catch (error: any) {
+        alert(error.message || 'Erro ao realizar login');
+      }
     }
   };
 

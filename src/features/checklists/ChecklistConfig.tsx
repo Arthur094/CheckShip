@@ -136,6 +136,9 @@ interface AreaItem {
     selectionType?: 'single' | 'multiple';
     selectionOptions?: string[];
     hint?: string;
+    allow_photo?: boolean;
+    allow_attachment?: boolean;
+    options?: string[]; // Legacy fallback
   };
 }
 
@@ -298,10 +301,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 hint: item.config?.hint,
                 scale_type: item.scaleType as any,
                 numeric_option: item.config?.numericOption,
-                registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined, // Simplify for DB if needed or keep raw
+                registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined,
                 selection_type: item.config?.selectionType,
                 selection_options: item.config?.selectionOptions || (item.config as any)?.options || [],
-                options: item.config?.selectionOptions || (item.config as any)?.options || [] // Mirror for safety
+                options: item.config?.selectionOptions || (item.config as any)?.options || [],
+                allow_photo: item.mandatoryAttachment, // Add photo capability for mobile
+                allow_attachment: item.mandatoryAttachment // Add attachment capability for mobile
               }
             })) || [],
             sub_areas: area.subAreas?.map(sub => ({
@@ -319,7 +324,9 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
                   selection_type: sitem.config?.selectionType,
                   selection_options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [],
-                  options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [] // Mirror for safety
+                  options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [],
+                  allow_photo: sitem.mandatoryAttachment, // Add photo capability for mobile
+                  allow_attachment: sitem.mandatoryAttachment // Add attachment capability for mobile
                 }
               })) || []
             })) || []
@@ -329,6 +336,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         assigned_user_ids: selectedUsers,
         updated_at: new Date().toISOString()
       };
+
+      console.log('performSave: Saving template to DB:', JSON.stringify(checklistData.structure, null, 2)); // DEBUG
 
       const { data, error } = await supabase
         .from('checklist_templates')
@@ -421,6 +430,9 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
   };
 
   const openItemForm = (areaIdx: number, subAreaIdx?: number, itemIdx?: number) => {
+    // ALWAYS reset form first to clear previous item's state
+    resetItemForm();
+
     setOpenItemFormLocation({ areaIdx, subAreaIdx });
 
     let item: AreaItem | undefined;
@@ -436,15 +448,26 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setEditingItemIdx(itemIdx);
       setItemName(item.name);
       setItemType(item.type);
-      setMandatoryAttachment(item.mandatoryAttachment);
+
+      // FIXED: Load mandatoryAttachment from config if it exists there
+      const attachmentFromConfig = item.config?.allow_photo || item.config?.allow_attachment || false;
+      setMandatoryAttachment(item.mandatoryAttachment || attachmentFromConfig);
 
       // Restore configurations
       if (item.config) {
+        console.log('Loading item config:', item.config); // DEBUG
         setRegistryOptions(item.config.registryOptions || []);
-        setNumericOption(item.config.numericOption || '');
-        setSelectionType(item.config.selectionType || 'single');
+        setNumericOption(item.config.numericOption || (item.config as any).numeric_option || '');
+
+        // FIX: Read selection_type from both camelCase (local state) and snake_case (database)
+        const selType = item.config.selectionType || (item.config as any).selection_type || 'single';
+        console.log('Setting selectionType to:', selType); // DEBUG
+        setSelectionType(selType);
+
         // Robust fallback for options loading
-        setSelectionOptions(item.config.selectionOptions || item.config.options || (item as any).options || []);
+        const opts = item.config.selectionOptions || (item.config as any).selection_options || item.config.options || (item as any).options || [];
+        setSelectionOptions(opts);
+
         setHintText(item.config.hint || '');
         setShowHint(!!item.config.hint);
       }
@@ -454,8 +477,6 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         const foundIdx = scaleOptions.findIndex(s => s.id === item.scaleType);
         if (foundIdx !== -1) setScaleIdx(foundIdx);
       }
-    } else {
-      resetItemForm();
     }
   };
 
@@ -480,6 +501,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         existingId = areas[areaIdx].items[editingItemIdx].id;
       }
     }
+
+    console.log('saveItem: Current selectionType state:', selectionType); // DEBUG
 
     const newItem: AreaItem = {
       id: existingId || Math.random().toString(36).substr(2, 9),
