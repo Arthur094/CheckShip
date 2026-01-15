@@ -1,5 +1,5 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { HashRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { useState, useEffect, createContext, useContext } from 'react';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import LoginScreen from './components/screens/LoginScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
