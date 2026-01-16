@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import BottomNav from '../BottomNav';
 import { useAuth } from '../../App';
 import { driverService } from '../../services/driverService';
+import { localStorageService } from '../../services/localStorageService';
+import { supabase } from '../../lib/supabase';
+import { cacheService } from '../../services/cacheService';
 
 type Tab = 'synced' | 'pending';
 
@@ -12,6 +15,14 @@ const CompletedScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('synced');
   const [completedItems, setCompletedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+
+  // Load last sync timestamp
+  useEffect(() => {
+    const sync = cacheService.getLastSync();
+    setLastSync(sync);
+  }, []);
 
   const loadCompletedInspections = useCallback(async () => {
     if (!session?.user?.id || loading) return;
@@ -29,6 +40,87 @@ const CompletedScreen: React.FC = () => {
   useEffect(() => {
     loadCompletedInspections();
   }, [loadCompletedInspections]);
+
+  // Sync cache manually
+  const handleCacheSync = async () => {
+    if (!session?.user?.id || syncing) return;
+    setSyncing(true);
+    try {
+      await cacheService.downloadAllData(session.user.id, supabase);
+      const sync = cacheService.getLastSync();
+      setLastSync(sync);
+      await loadCompletedInspections(); // Reload data after sync
+      alert('✅ Dados sincronizados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao sincronizar:', error);
+      alert('❌ Erro ao sincronizar dados');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleSyncOne = async (pendingId: string) => {
+    try {
+      const pending = localStorageService.getAllPending().find(p => p.id === pendingId);
+      if (!pending) return;
+
+      const { error } = await supabase
+        .from('checklist_inspections')
+        .insert({
+          checklist_template_id: pending.checklist_template_id,
+          vehicle_id: pending.vehicle_id,
+          inspector_id: pending.inspector_id,
+          responses: pending.responses,
+          status: pending.status,
+          started_at: pending.started_at,
+          completed_at: pending.completed_at
+        });
+
+      if (error) throw error;
+
+      localStorageService.removePending(pendingId);
+      alert('✅ Inspeção sincronizada com sucesso!');
+      loadCompletedInspections();
+    } catch (error: any) {
+      console.error('Erro ao sincronizar:', error);
+      alert('❌ Erro ao sincronizar: ' + error.message);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    const pending = localStorageService.getAllPending();
+    if (pending.length === 0) return;
+
+    let synced = 0;
+    let failed = 0;
+
+    for (const p of pending) {
+      try {
+        const { error } = await supabase
+          .from('checklist_inspections')
+          .insert({
+            checklist_template_id: p.checklist_template_id,
+            vehicle_id: p.vehicle_id,
+            inspector_id: p.inspector_id,
+            responses: p.responses,
+            status: p.status,
+            started_at: p.started_at,
+            completed_at: p.completed_at
+          });
+
+        if (error) throw error;
+
+        localStorageService.removePending(p.id);
+        synced++;
+      } catch (error) {
+        console.error('Erro ao sincronizar:', error);
+        failed++;
+      }
+    }
+
+    alert(`✅ ${synced} sincronizadas${failed > 0 ? `, ${failed} falharam` : ''}!`);
+    loadCompletedInspections();
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -54,11 +146,23 @@ const CompletedScreen: React.FC = () => {
         >
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
-        <h1 className="flex-1 text-center text-lg font-bold text-slate-900 truncate px-2">
-          Checklists Concluídos
-        </h1>
-        <button className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-100 transition-colors text-slate-900 relative">
-          <span className="material-symbols-outlined">notifications</span>
+        <div className="flex-1 text-center px-2">
+          <h1 className="text-lg font-bold text-slate-900 truncate">
+            Checklists Concluídos
+          </h1>
+          {lastSync && (
+            <p className="text-xs text-slate-500">
+              Sync: {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleCacheSync}
+          disabled={syncing}
+          className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-100 transition-colors text-slate-900 relative disabled:opacity-50"
+          title="Sincronizar dados"
+        >
+          <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>sync</span>
         </button>
       </header>
 
@@ -96,10 +200,67 @@ const CompletedScreen: React.FC = () => {
           )}
 
           {activeTab === 'pending' && (
-            <div className="text-center py-10 opacity-60">
-              <span className="material-symbols-outlined text-5xl text-slate-300 mb-2">cloud_off</span>
-              <p className="text-slate-400 text-sm">Função de sincronização offline será implementada em breve</p>
-            </div>
+            <>
+              <div className="flex items-center justify-between pb-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  Aguardando ({localStorageService.getPendingCount()})
+                </h3>
+                {localStorageService.getPendingCount() > 0 && (
+                  <button
+                    onClick={handleSyncAll}
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    Sincronizar Tudo
+                  </button>
+                )}
+              </div>
+
+              {localStorageService.getPendingCount() === 0 ? (
+                <div className="text-center py-10 opacity-60">
+                  <span className="material-symbols-outlined text-5xl text-slate-300 mb-2">cloud_done</span>
+                  <p className="text-slate-500 font-medium mt-2">Nenhuma inspeção pendente</p>
+                  <p className="text-xs text-slate-400 mt-1">Todas sincronizadas</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {localStorageService.getAllPending().map((inspection) => (
+                    <div
+                      key={inspection.id}
+                      className="bg-white rounded-2xl p-4 border border-orange-200 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-orange-600 text-2xl">cloud_upload</span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-slate-900 truncate">{inspection.vehiclePlate}</h3>
+                          <p className="text-sm text-slate-600 truncate">{inspection.templateName}</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="material-symbols-outlined text-orange-500 text-sm">schedule</span>
+                            <p className="text-xs text-orange-600 font-medium">
+                              {new Date(inspection.completed_at).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleSyncOne(inspection.id)}
+                          className="flex-shrink-0 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-blue-800 transition-colors"
+                        >
+                          Sync
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === 'synced' && (

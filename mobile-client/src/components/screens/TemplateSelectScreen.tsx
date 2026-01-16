@@ -15,14 +15,21 @@ const TemplateSelectScreen: React.FC = () => {
       if (!vehicleId) return;
       setLoading(true);
       try {
-        const [templatesData, vehicleData] = await Promise.all([
-          driverService.getAvailableTemplates(vehicleId),
-          driverService.getVehicleDetail(vehicleId)
-        ]);
+        // Load templates (with offline fallback)
+        const templatesData = await driverService.getAvailableTemplates(vehicleId);
         setTemplates(templatesData || []);
-        setVehicle(vehicleData);
+        console.log('✅ Templates carregados:', templatesData?.length);
+
+        // Try to load vehicle details (may fail offline)
+        try {
+          const vehicleData = await driverService.getVehicleDetail(vehicleId);
+          setVehicle(vehicleData);
+        } catch (vehicleError) {
+          console.log('⚠️ Não foi possível carregar detalhes do veículo (offline)');
+          // Continue anyway - templates já foram carregados
+        }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        console.error('Erro ao carregar templates:', error);
       } finally {
         setLoading(false);
       }

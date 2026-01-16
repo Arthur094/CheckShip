@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
+import { cacheService } from './services/cacheService';
 import LoginScreen from './components/screens/LoginScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import VehicleSelectScreen from './components/screens/VehicleSelectScreen';
@@ -52,13 +53,57 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    // Try to get session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (session) {
+        // Valid session found
+        setSession(session);
+      } else if (error || !session) {
+        // Session failed - check if we have cached user (offline mode)
+        const cachedUserId = cacheService.getUserId();
+        const cachedProfile = cacheService.getUserProfile();
+
+        if (cachedUserId && cachedProfile) {
+          console.log('📴 Offline: usando sessão em cache');
+          // Create mock session for offline use
+          setSession({
+            user: {
+              id: cachedUserId,
+              email: cachedProfile.email,
+              ...cachedProfile
+            },
+            offline: true // Flag to indicate this is cached
+          });
+        } else {
+          setSession(null);
+        }
+      }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+      if (session) {
+        setSession(session);
+      } else {
+        // Auth state changed to null - check cache before logging out
+        const cachedUserId = cacheService.getUserId();
+        const cachedProfile = cacheService.getUserProfile();
+
+        if (cachedUserId && cachedProfile && !navigator.onLine) {
+          console.log('📴 Token expirou mas está offline - mantendo sessão em cache');
+          // Keep cached session when offline
+          setSession({
+            user: {
+              id: cachedUserId,
+              email: cachedProfile.email,
+              ...cachedProfile
+            },
+            offline: true
+          });
+        } else {
+          setSession(null);
+        }
+      }
       setLoading(false);
     });
 

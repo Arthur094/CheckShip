@@ -15,7 +15,21 @@ export interface PendingInspection {
     templateName?: string;
 }
 
+export interface DraftInspection {
+    id: string;
+    key: string; // `${vehicleId}_${templateId}`
+    vehicleId: string;
+    templateId: string;
+    vehiclePlate: string;
+    templateName: string;
+    responses: Record<string, any>;
+    created_at: string;
+    updated_at: string;
+}
+
+
 const STORAGE_KEY = 'checkship_pending_inspections';
+const DRAFTS_KEY = 'checkship_draft_inspections';
 
 export const localStorageService = {
     // Salvar inspeção pendente
@@ -74,5 +88,63 @@ export const localStorageService = {
     // Contar pendentes
     getPendingCount(): number {
         return this.getAllPending().length;
+    },
+
+    // === DRAFT MANAGEMENT ===
+
+    // Salvar rascunho de inspeção
+    saveDraft(draft: Omit<DraftInspection, 'id' | 'key'>): string {
+        const key = `${draft.vehicleId}_${draft.templateId}`;
+        const fullDraft: DraftInspection = {
+            ...draft,
+            id: `draft_${Date.now()}`,
+            key,
+            updated_at: new Date().toISOString()
+        };
+
+        const existing = this.getAllDrafts();
+        const filtered = existing.filter(d => d.key !== key); // Remove rascunho anterior do mesmo checklist
+        filtered.push(fullDraft);
+        localStorage.setItem(DRAFTS_KEY, JSON.stringify(filtered));
+
+        console.log('💾 Rascunho salvo:', key);
+        return fullDraft.id;
+    },
+
+    // Buscar rascunho específico por veículo + template
+    getDraft(vehicleId: string, templateId: string): DraftInspection | null {
+        const key = `${vehicleId}_${templateId}`;
+        const all = this.getAllDrafts();
+        return all.find(d => d.key === key) || null;
+    },
+
+    // Buscar todos os rascunhos
+    getAllDrafts(): DraftInspection[] {
+        try {
+            const data = localStorage.getItem(DRAFTS_KEY);
+            return data ? JSON.parse(data) : [];
+        } catch (error) {
+            console.error('Erro ao buscar rascunhos:', error);
+            return [];
+        }
+    },
+
+    // Remover rascunho
+    removeDraft(key: string): boolean {
+        try {
+            const existing = this.getAllDrafts();
+            const filtered = existing.filter(d => d.key !== key);
+            localStorage.setItem(DRAFTS_KEY, JSON.stringify(filtered));
+            console.log('🗑️ Rascunho removido:', key);
+            return true;
+        } catch (error) {
+            console.error('Erro ao remover rascunho:', error);
+            return false;
+        }
+    },
+
+    // Contar rascunhos
+    getDraftsCount(): number {
+        return this.getAllDrafts().length;
     }
 };

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { driverService } from '../../services/driverService';
 import { supabase } from '../../lib/supabase';
 import { localStorageService } from '../../services/localStorageService';
+import { cacheService } from '../../services/cacheService';
 
 const InspectionScreen: React.FC = () => {
   const { vehicleId, templateId } = useParams();
@@ -14,10 +15,17 @@ const InspectionScreen: React.FC = () => {
 
   useEffect(() => {
     async function loadTemplate() {
-      if (!templateId) return;
+      if (!templateId || !vehicleId) return;
       try {
         const data = await driverService.getTemplateDetail(templateId);
         setTemplate(data);
+
+        // Check for existing draft
+        const existingDraft = localStorageService.getDraft(vehicleId, templateId);
+        if (existingDraft) {
+          console.log('📝 Rascunho encontrado, carregando respostas...');
+          setAnswers(existingDraft.responses);
+        }
       } catch (error) {
         console.error("Erro:", error);
       } finally {
@@ -25,7 +33,7 @@ const InspectionScreen: React.FC = () => {
       }
     }
     loadTemplate();
-  }, [templateId]);
+  }, [templateId, vehicleId]);
 
   // Helper to create proper answer format
   const createAnswer = (value: any, observation: string = '', photos: string[] = []) => ({
@@ -34,20 +42,67 @@ const InspectionScreen: React.FC = () => {
     photos: photos || []
   });
 
+  const handleSaveDraft = async () => {
+    if (!vehicleId || !templateId) {
+      alert('Erro: IDs inválidos.');
+      return;
+    }
+
+    try {
+      // Get vehicle and template names
+      const vehicleData = await supabase.from('vehicles').select('plate').eq('id', vehicleId).single();
+
+      localStorageService.saveDraft({
+        vehicleId,
+        templateId,
+        vehiclePlate: vehicleData.data?.plate || 'Desconhecido',
+        templateName: template?.name || 'Template desconhecido',
+        responses: answers,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      alert('💾 Rascunho salvo! Continue depois em "Iniciados".');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Erro ao salvar rascunho:', error);
+      alert('Erro ao salvar rascunho: ' + error.message);
+    }
+  };
+
   const handleFinish = async () => {
     try {
       setSaving(true);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert('Usuário não autenticado');
-        return;
+      // Try to get user (may fail offline)
+      let userId: string;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          userId = user.id;
+        } else {
+          // Fallback to cache
+          const cachedUserId = cacheService.getUserId();
+          if (!cachedUserId) {
+            alert('Usuário não autenticado');
+            return;
+          }
+          userId = cachedUserId;
+        }
+      } catch (authError) {
+        console.log('📴 Offline: usando user ID do cache');
+        const cachedUserId = cacheService.getUserId();
+        if (!cachedUserId) {
+          alert('Erro: Usuário não encontrado no cache');
+          return;
+        }
+        userId = cachedUserId;
       }
 
       const inspectionData = {
         checklist_template_id: templateId,
         vehicle_id: vehicleId,
-        inspector_id: user.id,
+        inspector_id: userId,
         responses: answers,
         status: 'completed',
         started_at: new Date().toISOString(),
@@ -67,6 +122,12 @@ const InspectionScreen: React.FC = () => {
 
         if (error) throw error;
 
+        // Remove draft if exists
+        if (vehicleId && templateId) {
+          const draftKey = `${vehicleId}_${templateId}`;
+          localStorageService.removeDraft(draftKey);
+        }
+
         console.log('Salvo online:', data);
         alert('Inspeção finalizada e sincronizada!');
         navigate('/');
@@ -83,7 +144,7 @@ const InspectionScreen: React.FC = () => {
         localStorageService.savePendingInspection({
           checklist_template_id: templateId,
           vehicle_id: vehicleId,
-          inspector_id: user.id,
+          inspector_id: userId,
           responses: answers,
           status: 'completed',
           started_at: new Date().toISOString(),
@@ -288,7 +349,13 @@ const InspectionScreen: React.FC = () => {
         )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t">
+      <footer className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t space-y-3">
+        <button
+          onClick={handleSaveDraft}
+          className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition-colors"
+        >
+          💾 Salvar Rascunho
+        </button>
         <button
           onClick={handleFinish}
           disabled={saving}

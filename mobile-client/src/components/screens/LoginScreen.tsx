@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { cacheService } from '../../services/cacheService';
 
 const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -8,23 +9,37 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Carregando...');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
 
     setLoading(true);
+    setLoadingMessage('Autenticando...');
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      alert(`Erro de login: ${error.message}`);
-      setLoading(false);
-    } else {
+      if (error) {
+        alert(`Erro de login: ${error.message}`);
+        setLoading(false);
+        return;
+      }
+
+      // Download data for offline use
+      setLoadingMessage('Baixando dados para uso offline...');
+      await cacheService.downloadAllData(data.user!.id, supabase);
+
+      console.log('✅ Login completo - Cache populado');
       navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Erro no login:', error);
+      alert('Erro ao fazer login: ' + error.message);
+      setLoading(false);
     }
   };
 
@@ -83,7 +98,7 @@ const LoginScreen: React.FC = () => {
             disabled={loading}
             className="flex w-full items-center justify-center rounded-lg bg-primary h-14 text-white font-bold"
           >
-            {loading ? 'Carregando...' : 'Entrar'}
+            {loading ? loadingMessage : 'Entrar'}
           </button>
         </form>
       </div>
