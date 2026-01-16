@@ -49,7 +49,7 @@ const ChecklistHistory: React.FC = () => {
           status,
           started_at,
           completed_at,
-          answers,
+          responses,
           vehicle:vehicles!vehicle_id (
             plate,
             model,
@@ -65,8 +65,8 @@ const ChecklistHistory: React.FC = () => {
       // Post-process for issues count and filters
       const processed = (data || []).map((item: any) => {
         let issues = 0;
-        if (item.answers) {
-          Object.values(item.answers).forEach((ans: any) => {
+        if (item.responses) {
+          Object.values(item.responses).forEach((ans: any) => {
             if (ans?.answer === 'nao_conforme' || ans?.answer === 'reprovado') issues++;
           });
         }
@@ -241,8 +241,8 @@ const ChecklistHistory: React.FC = () => {
                     {/* Status */}
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${row.status === 'completed' || row.status === 'Aprovado' ? 'bg-green-100 text-green-700' :
-                          row.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                            'bg-slate-100 text-slate-600'
+                        row.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
                         }`}>
                         {row.status === 'completed' ? 'Finalizado' : row.status}
                       </span>

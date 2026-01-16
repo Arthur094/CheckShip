@@ -26,6 +26,13 @@ const InspectionScreen: React.FC = () => {
     loadTemplate();
   }, [templateId]);
 
+  // Helper to create proper answer format
+  const createAnswer = (value: any, observation: string = '', photos: string[] = []) => ({
+    answer: value,
+    observation: observation || null,
+    photos: photos || []
+  });
+
   const handleFinish = async () => {
     try {
       setSaving(true);
@@ -42,13 +49,15 @@ const InspectionScreen: React.FC = () => {
         checklist_template_id: templateId,
         vehicle_id: vehicleId,
         inspector_id: user.id,
-        answers: answers,
+        responses: answers,
         status: 'completed',
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      console.log('✅ Salvando inspeção com responses:', Object.keys(inspectionData.responses).length, 'respostas');
 
       const { data, error } = await supabase
         .from('checklist_inspections')
@@ -111,8 +120,8 @@ const InspectionScreen: React.FC = () => {
                       {['Conforme', 'Não Conforme', 'N/A'].map((opt) => (
                         <button
                           key={opt}
-                          onClick={() => setAnswers({ ...answers, [item.id]: opt })}
-                          className={`flex-1 py-3 rounded-lg border text-xs font-bold transition-all ${answers[item.id] === opt
+                          onClick={() => setAnswers({ ...answers, [item.id]: createAnswer(opt) })}
+                          className={`flex-1 py-3 rounded-lg border text-xs font-bold transition-all ${answers[item.id]?.answer === opt
                             ? (opt === 'Não Conforme' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-900 text-white border-blue-900')
                             : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                             }`}
@@ -129,8 +138,8 @@ const InspectionScreen: React.FC = () => {
                       type="number"
                       placeholder="Informe o valor..."
                       className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
-                      onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
-                      value={answers[item.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
+                      value={answers[item.id]?.answer || ''}
                     />
                   )}
 
@@ -139,8 +148,8 @@ const InspectionScreen: React.FC = () => {
                     <textarea
                       placeholder="Digite sua resposta..."
                       className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all min-h-[80px]"
-                      onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
-                      value={answers[item.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
+                      value={answers[item.id]?.answer || ''}
                     />
                   )}
 
@@ -149,8 +158,8 @@ const InspectionScreen: React.FC = () => {
                     <input
                       type="date"
                       className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
-                      onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
-                      value={answers[item.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
+                      value={answers[item.id]?.answer || ''}
                     />
                   )}
 
@@ -160,8 +169,8 @@ const InspectionScreen: React.FC = () => {
                       type="text"
                       placeholder="Digite aqui..."
                       className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
-                      onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
-                      value={answers[item.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
+                      value={answers[item.id]?.answer || ''}
                     />
                   )}
 
@@ -169,8 +178,8 @@ const InspectionScreen: React.FC = () => {
                   {item.type === 'Lista de Seleção' && (item.config?.selectionType || (item.config as any)?.selection_type) !== 'multiple' && (
                     <select
                       className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
-                      onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
-                      value={answers[item.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
+                      value={answers[item.id]?.answer || ''}
                     >
                       <option value="">Selecione uma opção...</option>
                       {(item.config?.selectionOptions || (item.config as any)?.selection_options || []).map((opt: any, idx: number) => (
@@ -183,7 +192,7 @@ const InspectionScreen: React.FC = () => {
                   {item.type === 'Lista de Seleção' && ((item.config?.selectionType || (item.config as any)?.selection_type) === 'multiple') && (
                     <div className="space-y-2">
                       {(item.config?.selectionOptions || (item.config as any)?.selection_options || []).map((opt: any, idx: number) => {
-                        const currentAnswers = answers[item.id] || [];
+                        const currentAnswers = answers[item.id]?.answer || [];
                         const isChecked = Array.isArray(currentAnswers) && currentAnswers.includes(opt);
 
                         return (
@@ -192,11 +201,11 @@ const InspectionScreen: React.FC = () => {
                               type="checkbox"
                               checked={isChecked}
                               onChange={(e) => {
-                                const current = Array.isArray(answers[item.id]) ? answers[item.id] : [];
+                                const current = Array.isArray(answers[item.id]?.answer) ? answers[item.id].answer : [];
                                 if (e.target.checked) {
-                                  setAnswers({ ...answers, [item.id]: [...current, opt] });
+                                  setAnswers({ ...answers, [item.id]: createAnswer([...current, opt]) });
                                 } else {
-                                  setAnswers({ ...answers, [item.id]: current.filter((v: any) => v !== opt) });
+                                  setAnswers({ ...answers, [item.id]: createAnswer(current.filter((v: any) => v !== opt)) });
                                 }
                               }}
                               className="w-5 h-5 text-blue-900 border-slate-300 rounded focus:ring-2 focus:ring-blue-100"

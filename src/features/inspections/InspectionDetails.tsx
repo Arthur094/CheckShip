@@ -34,6 +34,16 @@ const InspectionDetails: React.FC = () => {
 
             if (inspError) throw inspError;
 
+            console.log('🔍 FULL INSPECTION DATA:', JSON.stringify(inspData, null, 2));
+            console.log('🔍 Responses field exists?', 'responses' in inspData);
+            console.log('🔍 Responses value:', inspData.responses);
+            console.log('🔍 Responses type:', typeof inspData.responses);
+
+            if (inspData.responses) {
+                console.log('🔍 Responses keys:', Object.keys(inspData.responses));
+                console.log('🔍 First response:', Object.entries(inspData.responses)[0]);
+            }
+
             setInspection(inspData);
 
             // 2. Parse Template Structure 
@@ -56,8 +66,9 @@ const InspectionDetails: React.FC = () => {
     };
 
     const getAnswer = (itemId: string) => {
-        if (!inspection?.answers) return null;
-        return inspection.answers[itemId];
+        const answer = inspection?.responses?.[itemId];
+        console.log(`🔍 getAnswer("${itemId}"):`, answer);
+        return answer;
     };
 
     const scrollToArea = (areaId: string) => {
@@ -73,11 +84,11 @@ const InspectionDetails: React.FC = () => {
         if (!element) return;
 
         const opt = {
-            margin: [10, 10],
+            margin: [10, 10, 10, 10] as [number, number, number, number],
             filename: `inspecao-${inspection?.vehicle?.plate || 'checkship'}-${new Date().toISOString().split('T')[0]}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
+            image: { type: 'jpeg' as const, quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
         };
 
         html2pdf().set(opt).from(element).save();
