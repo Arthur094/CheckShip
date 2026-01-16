@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { driverService } from '../../services/driverService';
 import { supabase } from '../../lib/supabase';
+import { localStorageService } from '../../services/localStorageService';
 
 const InspectionScreen: React.FC = () => {
   const { vehicleId, templateId } = useParams();
@@ -37,14 +38,12 @@ const InspectionScreen: React.FC = () => {
     try {
       setSaving(true);
 
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         alert('Usuário não autenticado');
         return;
       }
 
-      // Create inspection record
       const inspectionData = {
         checklist_template_id: templateId,
         vehicle_id: vehicleId,
@@ -57,22 +56,50 @@ const InspectionScreen: React.FC = () => {
         updated_at: new Date().toISOString()
       };
 
-      console.log('✅ Salvando inspeção com responses:', Object.keys(inspectionData.responses).length, 'respostas');
+      console.log('Salvando:', Object.keys(inspectionData.responses).length, 'respostas');
 
-      const { data, error } = await supabase
-        .from('checklist_inspections')
-        .insert(inspectionData)
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('checklist_inspections')
+          .insert(inspectionData)
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      console.log('Inspeção salva:', data);
-      alert('Inspeção finalizada com sucesso!');
-      navigate('/'); // Volta para tela inicial
+        console.log('Salvo online:', data);
+        alert('Inspeção finalizada e sincronizada!');
+        navigate('/');
+      } catch (onlineError: any) {
+        console.warn('Falha online, salvando localmente...', onlineError);
+
+        if (!templateId || !vehicleId) {
+          alert('Erro: IDs inválidos.');
+          return;
+        }
+
+        const vehicleData = await supabase.from('vehicles').select('plate').eq('id', vehicleId).single();
+
+        localStorageService.savePendingInspection({
+          checklist_template_id: templateId,
+          vehicle_id: vehicleId,
+          inspector_id: user.id,
+          responses: answers,
+          status: 'completed',
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          vehiclePlate: vehicleData.data?.plate || 'Desconhecido',
+          templateName: template?.name || 'Template desconhecido'
+        });
+
+        alert('Sem conexão! Inspeção salva localmente. Vá em Concluídos > Aguardando para sincronizar.');
+        navigate('/');
+      }
     } catch (error: any) {
-      console.error('Erro ao salvar inspeção:', error);
-      alert('Erro ao salvar inspeção: ' + error.message);
+      console.error('Erro:', error);
+      alert('Erro ao finalizar: ' + error.message);
     } finally {
       setSaving(false);
     }
