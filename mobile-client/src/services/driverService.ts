@@ -65,7 +65,7 @@ export const driverService = {
         return data;
     },
 
-    // 4. Busca inspeções para o Dashboard
+    // 4. Busca inspeções INCOMPLETAS para o Dashboard
     async getRecentInspections(profileId: string) {
         const { data, error } = await supabase
             .from('checklist_inspections')
@@ -73,11 +73,34 @@ export const driverService = {
         id,
         status,
         started_at,
-        vehicles ( plate, model )
+        vehicles ( plate, model ),
+        template:checklist_templates!checklist_template_id ( name )
       `)
             .eq('inspector_id', profileId)
+            .neq('status', 'completed')
             .order('started_at', { ascending: false })
             .limit(10);
+
+        if (error) throw error;
+        return data;
+    },
+
+
+    // 4b. Busca inspeções COMPLETAS/SINCRONIZADAS
+    async getCompletedInspections(profileId: string) {
+        const { data, error } = await supabase
+            .from('checklist_inspections')
+            .select(`
+        id,
+        status,
+        completed_at,
+        vehicles ( plate, model ),
+        template:checklist_templates!checklist_template_id ( name )
+      `)
+            .eq('inspector_id', profileId)
+            .eq('status', 'completed')
+            .order('completed_at', { ascending: false })
+            .limit(50);
 
         if (error) throw error;
         return data;

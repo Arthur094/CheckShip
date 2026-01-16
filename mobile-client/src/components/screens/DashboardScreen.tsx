@@ -64,7 +64,7 @@ const DashboardScreen: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold uppercase">{inspection.vehicles?.plate}</h3>
-                  <p className="text-xs text-slate-500">{inspection.status}</p>
+                  <p className="text-xs text-slate-500">{inspection.template?.name || 'Template desconhecido'}</p>
                 </div>
               </div>
               <span className="material-symbols-outlined text-slate-300">chevron_right</span>
@@ -73,13 +73,15 @@ const DashboardScreen: React.FC = () => {
         )}
       </main>
 
-      <div className="fixed bottom-24 right-6 z-30">
+      <div className="fixed bottom-24 right-6 z-30 group">
         <button
           onClick={() => navigate('/vehicles')}
-          className="flex items-center justify-center h-14 bg-primary text-white rounded-full shadow-xl px-6 font-bold gap-2"
+          className="flex items-center justify-center h-14 bg-primary hover:bg-primary-dark text-white rounded-full shadow-xl px-4 transition-all duration-300"
         >
-          <span>Iniciar Inspeção</span>
-          <span className="material-symbols-outlined">add</span>
+          <div className="max-w-0 overflow-hidden group-hover:max-w-[150px] group-hover:mr-2 transition-[max-width,margin] duration-300 whitespace-nowrap">
+            <span className="text-sm font-bold">Iniciar Inspeção</span>
+          </div>
+          <span className="material-symbols-outlined text-[28px]">add</span>
         </button>
       </div>
 

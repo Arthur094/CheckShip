@@ -1,15 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import BottomNav from '../BottomNav';
+import { supabase } from '../../lib/supabase';
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, session } = useAuth();
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadUserProfile() {
+      if (!session?.user?.id) return;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name, role, email')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) throw error;
+        setUserProfile(data);
+      } catch (error) {
+        console.error('Erro ao carregar perfil:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadUserProfile();
+  }, [session?.user?.id]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleNotifications = () => {
+    alert('Não existe nenhuma notificação no momento');
+  };
+
+  const handleSupport = () => {
+    alert('Click no link e fale com o suporte pelo nosso whatsapp');
+    // Opcional: Abrir WhatsApp
+    // window.open('https://wa.me/5511999999999', '_blank');
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    const roleMap: Record<string, string> = {
+      'GESTOR': 'Gestor de Frota',
+      'MOTORISTA': 'Motorista',
+      'SUPERVISOR': 'Supervisor',
+      'ADMIN': 'Administrador'
+    };
+    return roleMap[role] || role;
   };
 
   return (
@@ -28,38 +73,46 @@ const ProfileScreen: React.FC = () => {
 
       <main className="flex flex-col gap-6 p-4 max-w-md mx-auto w-full">
         <section className="flex flex-col items-center bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="relative mb-4 group cursor-pointer">
-            <div
-              className="h-28 w-28 rounded-full border-4 border-slate-50 dark:border-slate-800 shadow-md overflow-hidden bg-slate-200 bg-cover bg-center"
-              style={{ backgroundImage: `url('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=300&auto=format&fit=crop')` }}
-            >
+          {loading ? (
+            <div className="py-8">
+              <div className="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-primary rounded-full"></div>
             </div>
-            <div className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center shadow-sm">
-              <span className="material-symbols-outlined text-[16px]">edit</span>
-            </div>
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-1">João Silva</h2>
-          <p className="text-slate-500 text-sm font-medium mb-1">Gestor de Frota</p>
-          <p className="text-slate-400 text-sm">joao.silva@checkship.com</p>
+          ) : (
+            <>
+              <div className="relative mb-4 group cursor-pointer">
+                <div
+                  className="h-28 w-28 rounded-full border-4 border-slate-50 shadow-md overflow-hidden bg-primary flex items-center justify-center text-white text-3xl font-bold"
+                >
+                  {userProfile?.full_name?.charAt(0) || 'U'}
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-1">{userProfile?.full_name || 'Usuário'}</h2>
+              <p className="text-slate-500 text-sm font-medium mb-1">{getRoleDisplayName(userProfile?.role || '')}</p>
+              <p className="text-slate-400 text-sm">{userProfile?.email || 'email@exemplo.com'}</p>
+            </>
+          )}
         </section>
 
         <nav className="flex flex-col gap-3">
-          <button className="flex items-center justify-between w-full bg-white p-4 rounded-xl shadow-sm border border-slate-100 active:scale-[0.99] transition-transform">
+          <button
+            onClick={handleNotifications}
+            className="flex items-center justify-between w-full bg-white p-4 rounded-xl shadow-sm border border-slate-100 active:scale-[0.99] transition-transform"
+          >
             <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center size-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-primary">
+              <div className="flex items-center justify-center size-10 rounded-lg bg-blue-50 text-primary">
                 <span className="material-symbols-outlined">notifications</span>
               </div>
               <span className="text-base font-medium text-slate-700">Notificações</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">2</span>
-              <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-            </div>
+            <span className="material-symbols-outlined text-slate-400">chevron_right</span>
           </button>
 
-          <button className="flex items-center justify-between w-full bg-white p-4 rounded-xl shadow-sm border border-slate-100 active:scale-[0.99] transition-transform">
+          <button
+            onClick={handleSupport}
+            className="flex items-center justify-between w-full bg-white p-4 rounded-xl shadow-sm border border-slate-100 active:scale-[0.99] transition-transform"
+          >
             <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center size-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-primary">
+              <div className="flex items-center justify-center size-10 rounded-lg bg-blue-50 text-primary">
                 <span className="material-symbols-outlined">help</span>
               </div>
               <span className="text-base font-medium text-slate-700">Ajuda e Suporte</span>
@@ -76,7 +129,7 @@ const ProfileScreen: React.FC = () => {
             <span className="material-symbols-outlined">logout</span>
             Sair da conta
           </button>
-          <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-4">Versão 2.4.0 (Build 2023)</p>
+          <p className="text-center text-xs text-slate-400 mt-4">Versão 2.4.0 (Build 2023)</p>
         </div>
       </main>
 
