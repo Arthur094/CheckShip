@@ -82,10 +82,29 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     }, [checklistId, vehicleId]);
 
     const handleAnswerChange = (itemId: string, value: any) => {
-        setAnswers(prev => ({
-            ...prev,
-            [itemId]: { ...prev[itemId], item_id: itemId, answer: value }
-        }));
+        setAnswers(prev => {
+            const current = prev[itemId] || { item_id: itemId };
+
+            // If value contains imageUrl, merge it
+            if (typeof value === 'object' && value.imageUrl) {
+                return {
+                    ...prev,
+                    [itemId]: {
+                        ...current,
+                        imageUrl: value.imageUrl
+                    }
+                };
+            }
+
+            // Otherwise, update answer normally
+            return {
+                ...prev,
+                [itemId]: {
+                    ...current,
+                    answer: value
+                }
+            };
+        });
     };
 
     const handleSave = async (complete: boolean = false) => {
@@ -187,6 +206,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                                     item={item}
                                     value={answers[item.id]?.answer}
                                     onChange={(val) => handleAnswerChange(item.id, val)}
+                                    inspectionId={inspectionId}
                                 />
                             ))}
 
@@ -203,6 +223,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                                                 item={item}
                                                 value={answers[item.id]?.answer}
                                                 onChange={(val) => handleAnswerChange(item.id, val)}
+                                                inspectionId={inspectionId}
                                             />
                                         ))}
                                     </div>
@@ -216,8 +237,20 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     );
 };
 
-const InspectionItem = ({ item, value, onChange }: { item: any, value: any, onChange: (val: any) => void }) => {
+const InspectionItem = ({ item, value, onChange, inspectionId }: {
+    item: any,
+    value: any,
+    onChange: (val: any) => void,
+    inspectionId: string | null
+}) => {
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+
+    // Load existing image if available
+    useEffect(() => {
+        if (value?.imageUrl) {
+            setMediaPreview(value.imageUrl);
+        }
+    }, [value?.imageUrl]);
 
     // Helper to format values based on masks
     const formatValue = (val: string, type: string) => {
@@ -232,13 +265,114 @@ const InspectionItem = ({ item, value, onChange }: { item: any, value: any, onCh
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Compress image using canvas
+    const compressImage = (file: File): Promise<Blob> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Max dimensions
+                    const MAX_WIDTH = 1920;
+                    const MAX_HEIGHT = 1920;
+
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Calculate new dimensions
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob(
+                        (blob) => {
+                            if (blob) resolve(blob);
+                            else reject(new Error('Falha ao comprimir imagem'));
+                        },
+                        'image/jpeg',
+                        0.85 // Quality
+                    );
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            const url = URL.createObjectURL(file);
-            setMediaPreview(url);
-            // Simulate save
-            alert('Arquivo anexado com sucesso!');
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Por favor, selecione apenas arquivos de imagem.');
+                return;
+            }
+
+            // Validate file size (max 10MB before compression)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Arquivo muito grande. Tamanho máximo: 10MB.');
+                return;
+            }
+
+            // Show preview while uploading
+            const previewUrl = URL.createObjectURL(file);
+            setMediaPreview(previewUrl);
+
+            try {
+                // Compress image
+                const compressedBlob = await compressImage(file);
+
+                // Generate unique filename
+                const fileExt = 'jpg'; // Always save as JPEG after compression
+                const fileName = `${inspectionId}_${item.id}_${Date.now()}.${fileExt}`;
+
+                // Upload to Supabase Storage
+                const { data, error: uploadError } = await supabase.storage
+                    .from('checklist-photos')
+                    .upload(fileName, compressedBlob, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: 'image/jpeg'
+                    });
+
+                if (uploadError) throw uploadError;
+
+                // Get public URL
+                const { data: { publicUrl } } = supabase.storage
+                    .from('checklist-photos')
+                    .getPublicUrl(fileName);
+
+                // Update preview with public URL
+                setMediaPreview(publicUrl);
+
+                // Save URL in answer
+                onChange({ imageUrl: publicUrl });
+
+                alert('Imagem enviada com sucesso!');
+            } catch (error: any) {
+                console.error('Erro ao fazer upload:', error);
+                alert('Erro ao enviar imagem: ' + error.message);
+                setMediaPreview(null);
+            }
         }
     };
 

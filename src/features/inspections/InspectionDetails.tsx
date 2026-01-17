@@ -314,6 +314,7 @@ function renderReportItem(item: any, answerData: any) {
     const answer = answerData?.answer;
     const observation = answerData?.observation;
     const photos = answerData?.photos || [];
+    const imageUrl = answerData?.imageUrl; // ← Nova linha
 
     return (
         <div key={item.id} className="p-6 hover:bg-slate-50/50 transition-colors">
@@ -345,6 +346,22 @@ function renderReportItem(item: any, answerData: any) {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* Single Image URL (from mandatory attachment) */}
+                    {imageUrl && (
+                        <div className="mt-4">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Evidência Fotográfica</p>
+                            <div className="w-40 h-40 rounded-lg bg-slate-100 border-2 border-slate-200 overflow-hidden relative group shadow-sm">
+                                <img src={imageUrl} alt="Evidência obrigatória" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                                    <Camera size={20} className="text-white" />
+                                </div>
+                                <div className="absolute bottom-0 inset-x-0 bg-green-500 text-white text-[10px] font-bold text-center py-1">
+                                    ANEXADA
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
