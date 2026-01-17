@@ -321,18 +321,6 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
 
-            // Validate file type
-            if (!file.type.startsWith('image/')) {
-                alert('Por favor, selecione apenas arquivos de imagem.');
-                return;
-            }
-
-            // Validate file size (max 10MB before compression)
-            if (file.size > 10 * 1024 * 1024) {
-                alert('Arquivo muito grande. Tamanho máximo: 10MB.');
-                return;
-            }
-
             // Show preview while uploading
             const previewUrl = URL.createObjectURL(file);
             setMediaPreview(previewUrl);
