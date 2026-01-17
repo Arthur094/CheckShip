@@ -1,14 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Plus,
     Search,
     Filter,
     MoreVertical,
     Pencil,
-    User as UserIcon
+    X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import MultiSelectDropdown from '../../components/common/MultiSelectDropdown';
 
 interface User {
     id: string;
@@ -18,15 +19,48 @@ interface User {
     active: boolean;
 }
 
+interface Vehicle {
+    id: string;
+    plate: string;
+}
+
+interface Checklist {
+    id: string;
+    name: string;
+}
+
 interface UserListProps {
     onNew: () => void;
     onEdit: (user: User) => void;
+}
+
+interface Filters {
+    vehicles: string[];
+    checklists: string[];
+    userTypes: string[];
+    active: string[];
 }
 
 const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showFilterPanel, setShowFilterPanel] = useState(false);
+    const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+    // Filter data
+    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [checklists, setChecklists] = useState<Checklist[]>([]);
+    const [userVehicles, setUserVehicles] = useState<Record<string, string[]>>({});
+    const [userChecklists, setUserChecklists] = useState<Record<string, string[]>>({});
+
+    // Filter selections
+    const [filters, setFilters] = useState<Filters>({
+        vehicles: [],
+        checklists: [],
+        userTypes: [],
+        active: []
+    });
 
     const fetchUsers = async () => {
         try {
@@ -35,9 +69,6 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                 .from('profiles')
                 .select('*')
                 .order('full_name');
-
-            console.log('Fetched users:', data);
-            console.log('Fetch error:', error);
 
             if (error) throw error;
             setUsers(data || []);
@@ -48,14 +79,114 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
         }
     };
 
+    const fetchVehicles = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('vehicles')
+                .select('id, plate')
+                .order('plate');
+
+            if (error) throw error;
+            setVehicles(data || []);
+        } catch (error: any) {
+            console.error('Error fetching vehicles:', error.message);
+        }
+    };
+
+    const fetchChecklists = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('checklist_templates')
+                .select('id, name')
+                .order('name');
+
+            if (error) throw error;
+            setChecklists(data || []);
+        } catch (error: any) {
+            console.error('Error fetching checklists:', error.message);
+        }
+    };
+
+    const fetchUserVehicles = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('vehicle_assignments')
+                .select('profile_id, vehicle_id')
+                .eq('active', true);
+
+            if (error) throw error;
+
+            const mapping: Record<string, string[]> = {};
+            (data || []).forEach(item => {
+                if (!mapping[item.profile_id]) {
+                    mapping[item.profile_id] = [];
+                }
+                mapping[item.profile_id].push(item.vehicle_id);
+            });
+
+            setUserVehicles(mapping);
+        } catch (error: any) {
+            console.error('Error fetching user vehicles:', error.message);
+        }
+    };
+
+    const fetchUserChecklists = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profile_checklist_permissions')
+                .select('profile_id, checklist_template_id');
+
+            if (error) throw error;
+
+            const mapping: Record<string, string[]> = {};
+            (data || []).forEach(item => {
+                if (!mapping[item.profile_id]) {
+                    mapping[item.profile_id] = [];
+                }
+                mapping[item.profile_id].push(item.checklist_template_id);
+            });
+
+            setUserChecklists(mapping);
+        } catch (error: any) {
+            console.error('Error fetching user checklists:', error.message);
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
+        fetchVehicles();
+        fetchChecklists();
+        fetchUserVehicles();
+        fetchUserChecklists();
     }, []);
 
-    const filteredUsers = users.filter(u =>
-        (u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
-        (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || '')
-    );
+    const filteredUsers = useMemo(() => {
+        return users.filter(user => {
+            // Search filter
+            const matchesSearch = searchTerm === '' ||
+                user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            // Vehicle filter
+            const matchesVehicles = filters.vehicles.length === 0 ||
+                (userVehicles[user.id] && filters.vehicles.some(v => userVehicles[user.id].includes(v)));
+
+            // Checklist filter
+            const matchesChecklists = filters.checklists.length === 0 ||
+                (userChecklists[user.id] && filters.checklists.some(c => userChecklists[user.id].includes(c)));
+
+            // User type filter
+            const matchesUserType = filters.userTypes.length === 0 ||
+                filters.userTypes.includes(user.role);
+
+            // Active status filter
+            const matchesActive = filters.active.length === 0 ||
+                (filters.active.includes('Sim') && user.active) ||
+                (filters.active.includes('Não') && !user.active);
+
+            return matchesSearch && matchesVehicles && matchesChecklists && matchesUserType && matchesActive;
+        });
+    }, [users, searchTerm, filters, userVehicles, userChecklists]);
 
     const getInitials = (name: string) => {
         if (!name) return '??';
@@ -87,6 +218,35 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
         }
     };
 
+    const handleFilterToggle = (filterName: string) => {
+        setActiveFilter(activeFilter === filterName ? null : filterName);
+    };
+
+    const handleClearFilters = () => {
+        setFilters({
+            vehicles: [],
+            checklists: [],
+            userTypes: [],
+            active: []
+        });
+    };
+
+    const hasActiveFilters = filters.vehicles.length > 0 ||
+        filters.checklists.length > 0 ||
+        filters.userTypes.length > 0 ||
+        filters.active.length > 0;
+
+    const vehicleOptions = vehicles.map(v => ({ id: v.id, label: v.plate }));
+    const checklistOptions = checklists.map(c => ({ id: c.id, label: c.name }));
+    const userTypeOptions = [
+        { id: 'MOTORISTA', label: 'Motorista' },
+        { id: 'GESTOR', label: 'Gestor' }
+    ];
+    const activeOptions = [
+        { id: 'Sim', label: 'Sim' },
+        { id: 'Não', label: 'Não' }
+    ];
+
     return (
         <div className="flex flex-col h-full bg-slate-50">
             {/* Header */}
@@ -114,11 +274,115 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-12 py-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all placeholder:text-slate-400 bg-slate-50"
                     />
-                    <button className="absolute right-4 text-slate-400 hover:text-blue-900 transition-colors">
+                    <button
+                        onClick={() => setShowFilterPanel(!showFilterPanel)}
+                        className={`absolute right-4 transition-colors ${showFilterPanel || hasActiveFilters ? 'text-blue-900' : 'text-slate-400 hover:text-blue-900'}`}
+                    >
                         <Filter size={20} />
                     </button>
                 </div>
             </div>
+
+            {/* Filter Panel */}
+            {showFilterPanel && (
+                <div className="bg-white px-8 py-6 border-b border-slate-200">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <MultiSelectDropdown
+                            title="Veículos"
+                            options={vehicleOptions}
+                            selected={filters.vehicles}
+                            onChange={(selected) => setFilters({ ...filters, vehicles: selected })}
+                            searchPlaceholder="Digite para pesquisar"
+                            isOpen={activeFilter === 'vehicles'}
+                            onToggle={() => handleFilterToggle('vehicles')}
+                        />
+
+                        <MultiSelectDropdown
+                            title="Checklists"
+                            options={checklistOptions}
+                            selected={filters.checklists}
+                            onChange={(selected) => setFilters({ ...filters, checklists: selected })}
+                            searchPlaceholder="Digite para pesquisar"
+                            isOpen={activeFilter === 'checklists'}
+                            onToggle={() => handleFilterToggle('checklists')}
+                        />
+
+                        <MultiSelectDropdown
+                            title="Tipo de Usuário"
+                            options={userTypeOptions}
+                            selected={filters.userTypes}
+                            onChange={(selected) => setFilters({ ...filters, userTypes: selected })}
+                            searchPlaceholder="Digite para pesquisar"
+                            isOpen={activeFilter === 'userTypes'}
+                            onToggle={() => handleFilterToggle('userTypes')}
+                        />
+
+                        <MultiSelectDropdown
+                            title="Ativo"
+                            options={activeOptions}
+                            selected={filters.active}
+                            onChange={(selected) => setFilters({ ...filters, active: selected })}
+                            searchPlaceholder="Digite para pesquisar"
+                            isOpen={activeFilter === 'active'}
+                            onToggle={() => handleFilterToggle('active')}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3">
+                        <button
+                            onClick={handleClearFilters}
+                            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                        >
+                            Limpar
+                        </button>
+                        <button
+                            onClick={() => setShowFilterPanel(false)}
+                            className="px-6 py-2 bg-blue-900 text-white text-sm font-bold rounded-lg hover:bg-blue-800 transition-colors"
+                        >
+                            Filtrar
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+                <div className="bg-slate-100 px-8 py-3 border-b border-slate-200 flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-slate-600">Filtros ativos:</span>
+                    {filters.vehicles.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                            Veículos ({filters.vehicles.length})
+                            <button onClick={() => setFilters({ ...filters, vehicles: [] })} className="hover:text-red-600">
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                    {filters.checklists.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                            Checklists ({filters.checklists.length})
+                            <button onClick={() => setFilters({ ...filters, checklists: [] })} className="hover:text-red-600">
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                    {filters.userTypes.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                            Tipo ({filters.userTypes.length})
+                            <button onClick={() => setFilters({ ...filters, userTypes: [] })} className="hover:text-red-600">
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                    {filters.active.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                            Ativo ({filters.active.length})
+                            <button onClick={() => setFilters({ ...filters, active: [] })} className="hover:text-red-600">
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* List content */}
             <div className="flex-1 overflow-x-auto p-8">

@@ -1,18 +1,39 @@
 
-import React, { useState, useEffect } from 'react';
-import { Search, Filter } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Filter, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import MultiSelectDropdown from '../../components/common/MultiSelectDropdown';
 
 interface UserVehiclesProps {
     profileId: string | null;
     onEnsureExists: () => Promise<boolean>;
 }
 
+interface VehicleType {
+    id: string;
+    name: string;
+}
+
+interface Filters {
+    vehicleTypes: string[];
+    active: string[];
+    display: string[];
+}
+
 const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [vehicles, setVehicles] = useState<any[]>([]);
+    const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
     const [assignments, setAssignments] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [showFilterPanel, setShowFilterPanel] = useState(false);
+    const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+    const [filters, setFilters] = useState<Filters>({
+        vehicleTypes: [],
+        active: [],
+        display: []
+    });
 
     const fetchData = async () => {
         if (!profileId) {
@@ -23,15 +44,23 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
         try {
             setLoading(true);
 
-            // 1. Fetch all vehicles
+            // 1. Fetch all vehicles with type info
             const { data: vehiclesData, error: vehiclesError } = await supabase
                 .from('vehicles')
-                .select('*')
+                .select('*, vehicle_types(id, name)')
                 .order('plate');
 
             if (vehiclesError) throw vehiclesError;
 
-            // 2. Fetch current assignments for this profile
+            // 2. Fetch vehicle types
+            const { data: typesData, error: typesError } = await supabase
+                .from('vehicle_types')
+                .select('id, name')
+                .order('name');
+
+            if (typesError) throw typesError;
+
+            // 3. Fetch current assignments for this profile
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('vehicle_assignments')
                 .select('vehicle_id')
@@ -40,6 +69,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
             if (assignmentsError) throw assignmentsError;
 
             setVehicles(vehiclesData || []);
+            setVehicleTypes(typesData || []);
             setAssignments(new Set((assignmentsData || []).map(a => a.vehicle_id)));
         } catch (error: any) {
             console.error('Error fetching vehicles/assignments:', error.message);
@@ -90,6 +120,32 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
         }
     };
 
+    const filteredVehicles = useMemo(() => {
+        return vehicles.filter(vehicle => {
+            // Search filter
+            const matchesSearch = searchTerm === '' ||
+                vehicle.plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                vehicle.model?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            // Vehicle type filter
+            const matchesVehicleType = filters.vehicleTypes.length === 0 ||
+                (vehicle.vehicle_type_id && filters.vehicleTypes.includes(vehicle.vehicle_type_id));
+
+            // Active status filter
+            const matchesActive = filters.active.length === 0 ||
+                (filters.active.includes('Sim') && vehicle.active) ||
+                (filters.active.includes('Não') && !vehicle.active);
+
+            // Display filter (Selected/Not Selected)
+            const isLinked = assignments.has(vehicle.id);
+            const matchesDisplay = filters.display.length === 0 ||
+                (filters.display.includes('Selecionados') && isLinked) ||
+                (filters.display.includes('Não Selecionados') && !isLinked);
+
+            return matchesSearch && matchesVehicleType && matchesActive && matchesDisplay;
+        });
+    }, [vehicles, searchTerm, filters, assignments]);
+
     const handleBulkToggle = async () => {
         if (!profileId || filteredVehicles.length === 0) return;
 
@@ -104,7 +160,6 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
         try {
             if (targetState) {
                 // Link all filtered vehicles
-                // Filter those not yet linked to avoid duplicates if insert doesn't ignore (but we can use upsert or ignore)
                 const toAdd = filteredVehicles
                     .filter(v => !assignments.has(v.id))
                     .map(v => ({
@@ -115,7 +170,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 if (toAdd.length > 0) {
                     const { error } = await supabase
                         .from('vehicle_assignments')
-                        .upsert(toAdd, { onConflict: 'vehicle_id, profile_id', ignoreDuplicates: true }); // upsert or insert with ignore
+                        .upsert(toAdd, { onConflict: 'vehicle_id, profile_id', ignoreDuplicates: true });
 
                     if (error) throw error;
                 }
@@ -127,7 +182,6 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
 
             } else {
                 // Unlink all filtered vehicles
-                // Delete where vehicle_id in filteredVehicles AND profile_id = profileId
                 const idsToRemove = filteredVehicles.map(v => v.id);
 
                 const { error } = await supabase
@@ -152,10 +206,31 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
         }
     };
 
-    const filteredVehicles = vehicles.filter(v =>
-        v.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.model.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleFilterToggle = (filterName: string) => {
+        setActiveFilter(activeFilter === filterName ? null : filterName);
+    };
+
+    const handleClearFilters = () => {
+        setFilters({
+            vehicleTypes: [],
+            active: [],
+            display: []
+        });
+    };
+
+    const hasActiveFilters = filters.vehicleTypes.length > 0 ||
+        filters.active.length > 0 ||
+        filters.display.length > 0;
+
+    const vehicleTypeOptions = vehicleTypes.map(vt => ({ id: vt.id, label: vt.name }));
+    const activeOptions = [
+        { id: 'Sim', label: 'Sim' },
+        { id: 'Não', label: 'Não' }
+    ];
+    const displayOptions = [
+        { id: 'Selecionados', label: 'Selecionados' },
+        { id: 'Não Selecionados', label: 'Não Selecionados' }
+    ];
 
     if (loading) {
         return (
@@ -176,6 +251,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
 
     return (
         <div className="flex flex-col h-full bg-slate-50">
+            {/* Search Bar */}
             <div className="px-8 py-6">
                 <div className="relative flex items-center bg-white rounded-lg border border-slate-200 shadow-sm">
                     <Search size={20} className="absolute left-4 text-slate-400" />
@@ -186,9 +262,103 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-12 py-3 bg-transparent outline-none text-sm text-slate-700 placeholder:text-slate-400"
                     />
+                    <button
+                        onClick={() => setShowFilterPanel(!showFilterPanel)}
+                        className={`absolute right-4 transition-colors ${showFilterPanel || hasActiveFilters ? 'text-blue-900' : 'text-slate-400 hover:text-blue-900'}`}
+                    >
+                        <Filter size={20} />
+                    </button>
                 </div>
             </div>
 
+            {/* Filter Panel */}
+            {showFilterPanel && (
+                <div className="px-8 pb-6">
+                    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                            <MultiSelectDropdown
+                                title="Tipo de Veículo"
+                                options={vehicleTypeOptions}
+                                selected={filters.vehicleTypes}
+                                onChange={(selected) => setFilters({ ...filters, vehicleTypes: selected })}
+                                searchPlaceholder="Digite para pesquisar"
+                                isOpen={activeFilter === 'vehicleTypes'}
+                                onToggle={() => handleFilterToggle('vehicleTypes')}
+                            />
+
+                            <MultiSelectDropdown
+                                title="Ativo"
+                                options={activeOptions}
+                                selected={filters.active}
+                                onChange={(selected) => setFilters({ ...filters, active: selected })}
+                                searchPlaceholder="Digite para pesquisar"
+                                isOpen={activeFilter === 'active'}
+                                onToggle={() => handleFilterToggle('active')}
+                            />
+
+                            <MultiSelectDropdown
+                                title="Exibir"
+                                options={displayOptions}
+                                selected={filters.display}
+                                onChange={(selected) => setFilters({ ...filters, display: selected })}
+                                searchPlaceholder="Digite para pesquisar"
+                                isOpen={activeFilter === 'display'}
+                                onToggle={() => handleFilterToggle('display')}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3">
+                            <button
+                                onClick={handleClearFilters}
+                                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                            >
+                                Limpar
+                            </button>
+                            <button
+                                onClick={() => setShowFilterPanel(false)}
+                                className="px-6 py-2 bg-blue-900 text-white text-sm font-bold rounded-lg hover:bg-blue-800 transition-colors"
+                            >
+                                Filtrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+                <div className="px-8 pb-4">
+                    <div className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-medium text-slate-600">Filtros ativos:</span>
+                        {filters.vehicleTypes.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                                Tipos ({filters.vehicleTypes.length})
+                                <button onClick={() => setFilters({ ...filters, vehicleTypes: [] })} className="hover:text-red-600">
+                                    <X size={14} />
+                                </button>
+                            </span>
+                        )}
+                        {filters.active.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                                Ativo ({filters.active.length})
+                                <button onClick={() => setFilters({ ...filters, active: [] })} className="hover:text-red-600">
+                                    <X size={14} />
+                                </button>
+                            </span>
+                        )}
+                        {filters.display.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                                Exibir ({filters.display.length})
+                                <button onClick={() => setFilters({ ...filters, display: [] })} className="hover:text-red-600">
+                                    <X size={14} />
+                                </button>
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Vehicles List */}
             <div className="flex-1 overflow-y-auto px-8 pb-8">
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
