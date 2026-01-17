@@ -59,6 +59,28 @@ const VehicleTypeList: React.FC<VehicleTypeListProps> = ({ onNew, onEdit }) => {
         setActiveMenu(activeMenu === id ? null : id);
     };
 
+    const handleDelete = async (type: VehicleType) => {
+        if (confirm(`Tem certeza que deseja excluir o tipo de veículo "${type.name}"?`)) {
+            try {
+                setLoading(true);
+                const { error } = await supabase
+                    .from('vehicle_types')
+                    .delete()
+                    .eq('id', type.id);
+
+                if (error) throw error;
+
+                alert('Tipo de veículo excluído com sucesso.');
+                fetchVehicleTypes();
+            } catch (error: any) {
+                console.error('Erro ao excluir tipo de veículo:', error);
+                alert('Erro ao excluir tipo de veículo: ' + error.message);
+                setLoading(false);
+            }
+        }
+        setActiveMenu(null);
+    };
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -170,7 +192,7 @@ const VehicleTypeList: React.FC<VehicleTypeListProps> = ({ onNew, onEdit }) => {
                                                     <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
                                                         <button
                                                             className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                                            onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}
+                                                            onClick={(e) => { e.stopPropagation(); handleDelete(type); }}
                                                         >
                                                             <Trash2 size={16} />
                                                             Excluir

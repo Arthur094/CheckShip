@@ -6,7 +6,11 @@ import {
     Filter,
     MoreVertical,
     Pencil,
-    X
+    X,
+    Trash2,
+    Cloud,
+    ToggleLeft,
+    ToggleRight
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import MultiSelectDropdown from '../../components/common/MultiSelectDropdown';
@@ -17,6 +21,8 @@ interface User {
     role: string;
     email: string;
     active: boolean;
+    document?: string;
+    phone?: string;
 }
 
 interface Vehicle {
@@ -47,6 +53,11 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
     const [loading, setLoading] = useState(true);
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+    // Selection state
+    const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+    const [showSelectAll, setShowSelectAll] = useState(false);
+    const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
 
     // Filter data
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -216,6 +227,32 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                 setLoading(false);
             }
         }
+        setOpenMenuUserId(null);
+    };
+
+    const handleDeactivate = async (user: User) => {
+        const newStatus = !user.active;
+        const action = newStatus ? 'ativar' : 'desativar';
+
+        if (confirm(`Tem certeza que gostaria de ${action} este usuário? (${user.full_name})`)) {
+            try {
+                setLoading(true);
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ active: newStatus })
+                    .eq('id', user.id);
+
+                if (error) throw error;
+
+                alert(`Usuário ${action}do com sucesso.`);
+                fetchUsers();
+            } catch (error: any) {
+                console.error(`Erro ao ${action} usuário:`, error);
+                alert(`Erro ao ${action} usuário: ` + error.message);
+                setLoading(false);
+            }
+        }
+        setOpenMenuUserId(null);
     };
 
     const handleFilterToggle = (filterName: string) => {
@@ -229,6 +266,141 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
             userTypes: [],
             active: []
         });
+    };
+
+    // Selection functions
+    const handleSelectUser = (userId: string) => {
+        const newSelection = new Set(selectedUsers);
+        if (newSelection.has(userId)) {
+            newSelection.delete(userId);
+        } else {
+            newSelection.add(userId);
+        }
+        setSelectedUsers(newSelection);
+    };
+
+    const handleSelectAll = () => {
+        const allUserIds = filteredUsers.map(u => u.id);
+        setSelectedUsers(new Set(allUserIds));
+        setShowSelectAll(false);
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedUsers(new Set());
+    };
+
+    // Bulk actions
+    const handleBulkDelete = async () => {
+        if (selectedUsers.size === 0) return;
+
+        const confirmed = window.confirm(
+            `Tem certeza que deseja excluir ${selectedUsers.size} usuários selecionados?`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            setLoading(true);
+
+            // Delete each user
+            const deletePromises = Array.from(selectedUsers).map(userId =>
+                supabase.functions.invoke('admin-delete-user', {
+                    body: { user_id: userId }
+                })
+            );
+
+            await Promise.all(deletePromises);
+
+            alert(`${selectedUsers.size} usuários excluídos com sucesso.`);
+            setSelectedUsers(new Set());
+            fetchUsers();
+        } catch (error: any) {
+            console.error('Erro ao excluir usuários:', error);
+            alert('Erro ao excluir usuários: ' + error.message);
+            setLoading(false);
+        }
+    };
+
+    const handleBulkToggleActive = async () => {
+        if (selectedUsers.size === 0) return;
+
+        const selectedUsersData = users.filter(u => selectedUsers.has(u.id));
+        const allActive = selectedUsersData.every(u => u.active);
+        const action = allActive ? 'inativar' : 'ativar';
+        const newStatus = !allActive;
+
+        const confirmed = window.confirm(
+            `Tem certeza que deseja ${action} ${selectedUsers.size} usuários selecionados?`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            setLoading(true);
+
+            // Update active status for all selected users
+            const { error } = await supabase
+                .from('profiles')
+                .update({ active: newStatus })
+                .in('id', Array.from(selectedUsers));
+
+            if (error) throw error;
+
+            alert(`${selectedUsers.size} usuários ${action}dos com sucesso.`);
+            setSelectedUsers(new Set());
+            fetchUsers();
+        } catch (error: any) {
+            console.error('Erro ao atualizar usuários:', error);
+            alert('Erro ao atualizar usuários: ' + error.message);
+            setLoading(false);
+        }
+    };
+
+    const handleBulkExport = () => {
+        if (selectedUsers.size === 0) return;
+
+        const confirmed = window.confirm(
+            `Exportar ${selectedUsers.size} usuários selecionados para planilha?`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const selectedUsersData = users.filter(u => selectedUsers.has(u.id));
+
+            // Create CSV content
+            const headers = ['Nome completo', 'E-mail', 'Cargo', 'Documento', 'Telefone'];
+            const rows = selectedUsersData.map(user => [
+                user.full_name || '',
+                user.email || '',
+                user.role || '',
+                user.document || '',
+                user.phone || ''
+            ]);
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+
+            link.setAttribute('href', url);
+            link.setAttribute('download', `usuarios_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            alert(`${selectedUsers.size} usuários exportados com sucesso.`);
+        } catch (error: any) {
+            console.error('Erro ao exportar usuários:', error);
+            alert('Erro ao exportar usuários: ' + error.message);
+        }
     };
 
     const hasActiveFilters = filters.vehicles.length > 0 ||
@@ -389,7 +561,28 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-w-[800px]">
                     {/* Table Header */}
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                        <div className="col-span-4 flex items-center gap-2">
+                        <div
+                            className="col-span-4 flex items-center gap-2 relative"
+                            onMouseEnter={() => setShowSelectAll(true)}
+                            onMouseLeave={() => setShowSelectAll(false)}
+                        >
+                            {showSelectAll && selectedUsers.size === 0 && (
+                                <button
+                                    onClick={handleSelectAll}
+                                    className="absolute -left-1 px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded shadow-sm hover:bg-blue-700 transition-all z-10"
+                                >
+                                    SELECIONAR TODOS
+                                </button>
+                            )}
+                            {selectedUsers.size > 0 && (
+                                <button
+                                    onClick={handleDeselectAll}
+                                    className="mr-2 text-blue-600 hover:text-blue-800"
+                                    title="Desmarcar todos"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
                             Nome
                         </div>
                         <div className="col-span-3">Cargo</div>
@@ -415,6 +608,12 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                                     className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors group"
                                 >
                                     <div className="col-span-4 flex items-center gap-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedUsers.has(user.id)}
+                                            onChange={() => handleSelectUser(user.id)}
+                                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        />
                                         <div className={`w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 text-xs font-bold tracking-wide`}>
                                             {getInitials(user.full_name)}
                                         </div>
@@ -445,14 +644,55 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                                             >
                                                 <Pencil size={16} />
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(user)}
-                                                className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-red-600 transition-colors"
-                                                title="Excluir"
-                                            >
-                                                <MoreVertical size={16} className="hidden" /> {/* Mantendo alinhamento se necessário, ou usar Trash */}
-                                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                                            </button>
+
+                                            {/* Dropdown Menu */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setOpenMenuUserId(openMenuUserId === user.id ? null : user.id)}
+                                                    className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                                                    title="Mais opções"
+                                                >
+                                                    <MoreVertical size={16} />
+                                                </button>
+
+                                                {openMenuUserId === user.id && (
+                                                    <>
+                                                        {/* Backdrop */}
+                                                        <div
+                                                            className="fixed inset-0 z-10"
+                                                            onClick={() => setOpenMenuUserId(null)}
+                                                        />
+
+                                                        {/* Menu */}
+                                                        <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                                                            <button
+                                                                onClick={() => handleDeactivate(user)}
+                                                                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                            >
+                                                                {user.active ? (
+                                                                    <>
+                                                                        <ToggleLeft size={16} />
+                                                                        Desativar
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <ToggleRight size={16} />
+                                                                        Ativar
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                            <div className="border-t border-slate-100" />
+                                                            <button
+                                                                onClick={() => handleDelete(user)}
+                                                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                                Excluir
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -461,6 +701,49 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Floating Action Bar */}
+            {selectedUsers.size > 0 && (
+                <div className="sticky bottom-0 bg-white border-t border-slate-200 px-8 py-4 flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-4">
+                        {/* Delete Button */}
+                        <button
+                            onClick={handleBulkDelete}
+                            className="p-2 hover:bg-red-50 rounded-lg text-slate-600 hover:text-red-600 transition-colors"
+                            title="Excluir selecionados"
+                        >
+                            <Trash2 size={20} />
+                        </button>
+
+                        {/* Toggle Active/Inactive Button */}
+                        <button
+                            onClick={handleBulkToggleActive}
+                            className="p-2 hover:bg-blue-50 rounded-lg text-slate-600 hover:text-blue-600 transition-colors"
+                            title="Ativar/Inativar selecionados"
+                        >
+                            {users.filter(u => selectedUsers.has(u.id)).every(u => u.active) ? (
+                                <ToggleRight size={20} />
+                            ) : (
+                                <ToggleLeft size={20} />
+                            )}
+                        </button>
+
+                        {/* Export Button */}
+                        <button
+                            onClick={handleBulkExport}
+                            className="p-2 hover:bg-green-50 rounded-lg text-slate-600 hover:text-green-600 transition-colors"
+                            title="Exportar selecionados"
+                        >
+                            <Cloud size={20} />
+                        </button>
+                    </div>
+
+                    {/* Counter */}
+                    <div className="text-sm text-slate-600 font-medium">
+                        {selectedUsers.size} de {filteredUsers.length} selecionado{selectedUsers.size !== 1 ? 's' : ''}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
