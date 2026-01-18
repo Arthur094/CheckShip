@@ -26,7 +26,7 @@ export const cacheService = {
         try {
             // Parallel download for speed
             const [vehicles, templateAssignments, templates, completed, profile] = await Promise.all([
-                // 1. My vehicles
+                // 1. My vehicles (including vehicle_type_id for type-based template filtering)
                 supabase
                     .from('vehicle_assignments')
                     .select(`
@@ -37,52 +37,66 @@ export const cacheService = {
               model,
               brand,
               status,
-              current_km
+              current_km,
+              vehicle_type_id
             )
           `)
                     .eq('profile_id', userId)
                     .eq('active', true)
                     .then((res: any) => res.data?.map((item: any) => item.vehicles) || []),
 
-                // 2. Template assignments (vehicle-template mapping)
+                // 2. Template assignments by VEHICLE TYPE (for offline filtering)
                 (async () => {
-                    const { data: assignments } = await supabase
+                    // Get vehicles first to find their types
+                    const { data: vehicleAssignments } = await supabase
                         .from('vehicle_assignments')
-                        .select('vehicle_id')
+                        .select('vehicles(vehicle_type_id)')
                         .eq('profile_id', userId)
                         .eq('active', true);
 
-                    if (!assignments || assignments.length === 0) return [];
+                    if (!vehicleAssignments || vehicleAssignments.length === 0) return [];
 
-                    const vehicleIds = assignments.map((a: any) => a.vehicle_id);
+                    const vehicleTypeIds = [...new Set(
+                        vehicleAssignments
+                            .map((a: any) => a.vehicles?.vehicle_type_id)
+                            .filter(Boolean)
+                    )];
+
+                    if (vehicleTypeIds.length === 0) return [];
 
                     const { data: templateAssignments } = await supabase
-                        .from('vehicle_checklist_assignments')
-                        .select('vehicle_id, checklist_template_id')
-                        .in('vehicle_id', vehicleIds);
+                        .from('vehicle_type_checklist_assignments')
+                        .select('vehicle_type_id, checklist_template_id')
+                        .in('vehicle_type_id', vehicleTypeIds);
 
                     return templateAssignments || [];
                 })(),
 
-                // 3. All templates
+                // 3. All templates for the user's vehicle types
                 (async () => {
-                    const { data: assignments } = await supabase
+                    const { data: vehicleAssignments } = await supabase
                         .from('vehicle_assignments')
-                        .select('vehicle_id')
+                        .select('vehicles(vehicle_type_id)')
                         .eq('profile_id', userId)
                         .eq('active', true);
 
-                    if (!assignments || assignments.length === 0) return [];
+                    if (!vehicleAssignments || vehicleAssignments.length === 0) return [];
 
-                    const vehicleIds = assignments.map((a: any) => a.vehicle_id);
+                    const vehicleTypeIds = [...new Set(
+                        vehicleAssignments
+                            .map((a: any) => a.vehicles?.vehicle_type_id)
+                            .filter(Boolean)
+                    )];
+
+                    if (vehicleTypeIds.length === 0) return [];
 
                     const { data: templateAssignments } = await supabase
-                        .from('vehicle_checklist_assignments')
+                        .from('vehicle_type_checklist_assignments')
                         .select(`
                             checklist_template_id,
                             checklist_templates (*)
                         `)
-                        .in('vehicle_id', vehicleIds);
+                        .in('vehicle_type_id', vehicleTypeIds);
 
                     if (!templateAssignments) return [];
 

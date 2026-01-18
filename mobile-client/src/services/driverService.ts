@@ -42,38 +42,64 @@ export const driverService = {
         return data;
     },
 
-    // 2. Busca templates do veículo (com cache fallback)
+    // 2. Busca templates disponíveis para o veículo baseado no TIPO do veículo
     async getAvailableTemplates(vehicleId: string) {
         try {
-            const { data, error } = await supabase
-                .from('vehicle_checklist_assignments')
-                .select(`
-            checklist_template_id,
-            checklist_templates (
-              id,
-              name,
-              description,
-              structure
-            )
-          `)
-                .eq('vehicle_id', vehicleId);
+            // Step 1: Get the vehicle's vehicle_type_id
+            const { data: vehicleData, error: vehicleError } = await supabase
+                .from('vehicles')
+                .select('vehicle_type_id')
+                .eq('id', vehicleId)
+                .single();
 
-            if (error) throw error;
-            const templates = data.map((item: any) => item.checklist_templates);
+            if (vehicleError) throw vehicleError;
+
+            if (!vehicleData?.vehicle_type_id) {
+                console.log('⚠️ Veículo não tem tipo de veículo definido');
+                return [];
+            }
+
+            // Step 2: Get all templates linked to this vehicle type
+            const { data: assignments, error: assignmentError } = await supabase
+                .from('vehicle_type_checklist_assignments')
+                .select(`
+                    checklist_template_id,
+                    checklist_templates (
+                        id,
+                        name,
+                        description,
+                        structure
+                    )
+                `)
+                .eq('vehicle_type_id', vehicleData.vehicle_type_id);
+
+            if (assignmentError) throw assignmentError;
+
+            const templates = assignments?.map((item: any) => item.checklist_templates).filter(Boolean) || [];
+            console.log('✅ Templates para tipo de veículo:', templates.length);
             return templates;
         } catch (error) {
-            console.log('📴 Offline: filtrando templates por veículo do cache');
+            console.log('📴 Offline: filtrando templates por tipo de veículo do cache');
+
+            // Get vehicle from cache to find its type
+            const vehicles = cacheService.getVehicles();
+            const vehicle = vehicles.find((v: any) => v.id === vehicleId);
+
+            if (!vehicle?.vehicle_type_id) {
+                console.log('⚠️ Veículo não encontrado no cache ou sem tipo');
+                return [];
+            }
 
             // Get assignments and templates from cache
             const assignments = cacheService.getTemplateAssignments();
             const allTemplates = cacheService.getTemplates();
 
-            // Filter: get template IDs for this vehicle
+            // Filter: get template IDs for this vehicle TYPE
             const templateIds = assignments
-                .filter((a: any) => a.vehicle_id === vehicleId)
+                .filter((a: any) => a.vehicle_type_id === vehicle.vehicle_type_id)
                 .map((a: any) => a.checklist_template_id);
 
-            // Return only templates for this vehicle
+            // Return only templates for this vehicle type
             return allTemplates.filter((t: any) => templateIds.includes(t.id));
         }
     },
