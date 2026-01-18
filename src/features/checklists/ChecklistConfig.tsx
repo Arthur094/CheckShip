@@ -65,21 +65,28 @@ const Accordion: React.FC<AccordionProps> = ({ title, isOpen, onToggle, children
   );
 };
 
-const Toggle: React.FC<{ label: string; description?: string; active?: boolean; badge?: string; onChange?: (val: boolean) => void }> = ({ label, description, active = false, badge, onChange }) => {
+const Toggle: React.FC<{ label: string; description?: string; active?: boolean; badge?: string; disabled?: boolean; onChange?: (val: boolean) => void }> = ({ label, description, active = false, badge, disabled = false, onChange }) => {
   const [isOn, setIsOn] = useState(active);
+
+  // Sync with external state changes
+  useEffect(() => {
+    setIsOn(active);
+  }, [active]);
+
   const handleToggle = () => {
+    if (disabled) return;
     const newState = !isOn;
     setIsOn(newState);
     if (onChange) onChange(newState);
   };
 
   return (
-    <div className="flex items-start justify-between py-3 group">
+    <div className={`flex items-start justify-between py-3 group ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex-1 pr-4">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-700">{label}</span>
           {badge && (
-            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded uppercase">
+            <span className={`px-1.5 py-0.5 text-[8px] font-black rounded uppercase ${badge === 'EM BREVE' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
               {badge}
             </span>
           )}
@@ -88,7 +95,8 @@ const Toggle: React.FC<{ label: string; description?: string; active?: boolean; 
       </div>
       <button
         onClick={handleToggle}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isOn ? 'bg-blue-900' : 'bg-slate-300'}`}
+        disabled={disabled}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isOn ? 'bg-blue-900' : 'bg-slate-300'} ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-6' : 'translate-x-1'}`} />
       </button>
@@ -182,6 +190,10 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     geo_fence_end: false
   });
 
+  // PDF Customization
+  const [pdfHeaderImage, setPdfHeaderImage] = useState<string>('');
+  const [pdfTitle, setPdfTitle] = useState<string>('');
+
   // Selections
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -227,6 +239,10 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setSelectedVehicleTypes(initialTemplate.target_vehicle_types as any);
       setSelectedUsers(initialTemplate.assigned_user_ids);
 
+      // Load PDF customization fields
+      setPdfHeaderImage((initialTemplate as any).pdf_header_image || '');
+      setPdfTitle((initialTemplate as any).pdf_title || '');
+
       if (initialTemplate.structure?.areas) {
         setAreas(initialTemplate.structure.areas as any);
       }
@@ -249,6 +265,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setSelectedVehicleTypes([]);
       setSelectedUsers([]);
       setAreas([]);
+      setPdfHeaderImage('');
+      setPdfTitle('');
     }
     setActiveTab('DADOS CADASTRAIS');
   }, [initialTemplate]);
@@ -265,14 +283,14 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     setActiveAreaMenuIdx(null);
   };
 
-  const performSave = async (silent = false): Promise<boolean> => {
+  const performSave = async (silent = false): Promise<string | null> => {
     try {
       if (!silent) {
         // Validation only if not silent? Or always?
         // Let's validate name at least
         if (!name.trim()) {
           alert('O nome do checklist é obrigatório.');
-          return false;
+          return null;
         }
       }
 
@@ -334,6 +352,9 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         },
         target_vehicle_types: selectedVehicleTypes as any,
         assigned_user_ids: selectedUsers,
+        // PDF fields commented out until database migration is applied
+        // pdf_header_image: pdfHeaderImage || null,
+        // pdf_title: pdfTitle || null,
         updated_at: new Date().toISOString()
       };
 
@@ -347,7 +368,9 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
       if (error) throw error;
 
+      let savedId = checklistId;
       if (data) {
+        savedId = data.id;
         setChecklistId(data.id);
         // If it was temp, we are no longer in creation mode technically, or we preserve it.
       }
@@ -356,11 +379,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         alert('Checklist salvo com sucesso!');
         onBack();
       }
-      return true;
+      console.log('[ChecklistConfig] performSave returning savedId:', savedId);
+      return savedId; // Return the real ID
     } catch (error: any) {
       console.error('Erro ao salvar checklist:', error.message);
       if (!silent) alert('Erro ao salvar: ' + error.message);
-      return false;
+      return null;
     }
   };
 
@@ -646,10 +670,14 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 </label>
                 <div className="flex items-center gap-6 p-6 border border-slate-100 rounded-xl bg-slate-50/50">
                   <div className="h-16 w-48 bg-white border border-slate-200 rounded flex items-center justify-center overflow-hidden">
-                    <div className="flex items-center gap-2 font-black text-green-600 text-lg">
-                      <Check size={24} className="stroke-[3]" />
-                      checklistfácil
-                    </div>
+                    {pdfHeaderImage ? (
+                      <img src={pdfHeaderImage} alt="Header PDF" className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="flex items-center gap-2 font-black text-blue-900 text-lg">
+                        <Check size={24} className="stroke-[3]" />
+                        CHECKSHIP
+                      </div>
+                    )}
                   </div>
                   <button className="text-xs font-black text-blue-900 uppercase hover:underline">Alterar Imagem</button>
                 </div>
@@ -658,10 +686,18 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 <Toggle
                   label="Personalizar informações do PDF"
                   active={false}
+                  disabled={true}
+                  badge="EM BREVE"
                 />
                 <div className="mt-4 space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">Título do relatório</label>
-                  <input type="text" placeholder="Relatório de Inspeção" disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Relatório de Inspeção"
+                    value={pdfTitle}
+                    onChange={(e) => setPdfTitle(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900"
+                  />
                 </div>
               </div>
             </div>
@@ -671,28 +707,40 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
             <Toggle
               label="Aplicar checklist somente pelo aplicativo"
-              active={settings.appOnly}
-              onChange={(val) => setSettings(prev => ({ ...prev, appOnly: val }))}
+              description="Quando habilitado, este template aparecerá apenas no aplicativo mobile"
+              active={settings.app_only}
+              onChange={(val) => setSettings(prev => ({ ...prev, app_only: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
             <Toggle
               label="Permitir anexar arquivos da memória do dispositivo"
-              active={settings.allowGallery}
-              onChange={(val) => setSettings(prev => ({ ...prev, allowGallery: val }))}
+              description="Quando desabilitado, apenas a câmera poderá ser usada para itens com anexo obrigatório"
+              active={settings.allow_gallery}
+              onChange={(val) => setSettings(prev => ({ ...prev, allow_gallery: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
             <Toggle
               label="Responder itens em massa"
-              active={settings.bulkAnswer}
-              onChange={(val) => setSettings(prev => ({ ...prev, bulkAnswer: val }))}
+              active={settings.bulk_answer}
+              onChange={(val) => setSettings(prev => ({ ...prev, bulk_answer: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
             <Toggle
               label="Exibir resultado parcial"
-              active={settings.partialResult}
-              onChange={(val) => setSettings(prev => ({ ...prev, partialResult: val }))}
+              active={settings.partial_result}
+              onChange={(val) => setSettings(prev => ({ ...prev, partial_result: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
             <Toggle
               label="Campos Nome e Cargo da assinatura são obrigatórios"
-              active={settings.mandatorySignature}
-              onChange={(val) => setSettings(prev => ({ ...prev, mandatorySignature: val }))}
+              active={settings.mandatory_signature}
+              onChange={(val) => setSettings(prev => ({ ...prev, mandatory_signature: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
           </div>
         </Accordion>
@@ -702,13 +750,17 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
               <Toggle
                 label="Compartilhar checklist por e-mail"
-                active={settings.shareEmail}
-                onChange={(val) => setSettings(prev => ({ ...prev, shareEmail: val }))}
+                active={settings.share_email}
+                onChange={(val) => setSettings(prev => ({ ...prev, share_email: val }))}
+                disabled={true}
+                badge="EM BREVE"
               />
               <Toggle
                 label="Assinatura"
-                active={settings.mandatorySignature}
-                onChange={(val) => setSettings(prev => ({ ...prev, mandatorySignature: val }))}
+                active={settings.mandatory_signature}
+                onChange={(val) => setSettings(prev => ({ ...prev, mandatory_signature: val }))}
+                disabled={true}
+                badge="EM BREVE"
               />
             </div>
           </div>
@@ -717,13 +769,17 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
             <Toggle
               label="Bloquear início fora da unidade"
-              active={settings.geoFenceStart}
-              onChange={(val) => setSettings(prev => ({ ...prev, geoFenceStart: val }))}
+              active={settings.geo_fence_start}
+              onChange={(val) => setSettings(prev => ({ ...prev, geo_fence_start: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
             <Toggle
               label="Bloquear conclusão fora da unidade"
-              active={settings.geoFenceEnd}
-              onChange={(val) => setSettings(prev => ({ ...prev, geoFenceEnd: val }))}
+              active={settings.geo_fence_end}
+              onChange={(val) => setSettings(prev => ({ ...prev, geo_fence_end: val }))}
+              disabled={true}
+              badge="EM BREVE"
             />
           </div>
         </Accordion>
@@ -1256,7 +1312,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
   function renderTiposUnidade() {
     return (
-      <div className="max-w-7xl w-full mx-auto p-8 h-[calc(100vh-200px)]">
+      <div className="max-w-7xl w-full mx-auto p-8">
         <ChecklistVehicleTypes checklistId={checklistId} onEnsureExists={() => performSave(true)} />
       </div>
     );
@@ -1264,7 +1320,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
   function renderUsuarios() {
     return (
-      <div className="max-w-7xl w-full mx-auto p-8 h-[calc(100vh-200px)]">
+      <div className="max-w-7xl w-full mx-auto p-8">
         <ChecklistUsers checklistId={checklistId} onEnsureExists={() => performSave(true)} />
       </div>
     );

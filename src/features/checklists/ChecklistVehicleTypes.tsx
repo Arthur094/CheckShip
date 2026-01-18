@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 
 interface ChecklistVehicleTypesProps {
     checklistId: string | null;
-    onEnsureExists: () => Promise<boolean>;
+    onEnsureExists: () => Promise<string | null>; // Now returns the actual ID after save
 }
 
 const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklistId, onEnsureExists }) => {
@@ -13,9 +13,13 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
     const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
     const [assignments, setAssignments] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [activeChecklistId, setActiveChecklistId] = useState<string | null>(checklistId); // Track real ID
 
     const fetchData = async () => {
-        if (!checklistId || checklistId.startsWith('chk_')) { // Don't fetch for temporary IDs
+        console.log('[ChecklistVehicleTypes] fetchData called with checklistId:', checklistId);
+
+        if (!checklistId) {
+            console.log('[ChecklistVehicleTypes] No checklistId, fetching only vehicle types');
             // Fetch only types, assignments will be empty
             const { data, error } = await supabase
                 .from('vehicle_types')
@@ -39,12 +43,15 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
             if (typesError) throw typesError;
 
             // 2. Fetch current vehicle types assigned this checklist
+            console.log('[ChecklistVehicleTypes] Fetching assignments for checklistId:', checklistId);
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('vehicle_type_checklist_assignments')
                 .select('vehicle_type_id')
                 .eq('checklist_template_id', checklistId);
 
             if (assignmentsError) throw assignmentsError;
+
+            console.log('[ChecklistVehicleTypes] Assignments loaded:', assignmentsData?.length || 0, assignmentsData);
 
             setVehicleTypes(typesData || []);
             setAssignments(new Set((assignmentsData || []).map(a => a.vehicle_type_id)));
@@ -56,12 +63,19 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
     };
 
     useEffect(() => {
+        console.log('[ChecklistVehicleTypes] useEffect triggered, checklistId:', checklistId);
         fetchData();
     }, [checklistId]);
 
     const handleToggleLink = async (typeId: string, isLinked: boolean) => {
-        const exists = await onEnsureExists();
-        if (!exists || !checklistId) return;
+        const realId = await onEnsureExists();
+        console.log('[ChecklistVehicleTypes] handleToggleLink - realId from onEnsureExists:', realId);
+        if (!realId) return;
+
+        // Update active ID if we got a new one
+        if (realId !== activeChecklistId) {
+            setActiveChecklistId(realId);
+        }
 
         try {
             if (isLinked) {
@@ -69,7 +83,7 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
                     .delete()
-                    .match({ checklist_template_id: checklistId, vehicle_type_id: typeId });
+                    .match({ checklist_template_id: realId, vehicle_type_id: typeId });
 
                 if (error) throw error;
 
@@ -77,10 +91,13 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                 newAssignments.delete(typeId);
                 setAssignments(newAssignments);
             } else {
-                // Add assignment
+                // Add assignment - use upsert to avoid duplicate key errors
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
-                    .insert({ checklist_template_id: checklistId, vehicle_type_id: typeId });
+                    .upsert(
+                        { checklist_template_id: realId, vehicle_type_id: typeId },
+                        { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true }
+                    );
 
                 if (error) throw error;
 
@@ -95,11 +112,25 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
     };
 
     const handleBulkToggle = async () => {
-        const exists = await onEnsureExists();
-        if (!exists || !checklistId || filteredTypes.length === 0) return;
+        console.log('[ChecklistVehicleTypes] handleBulkToggle called');
+        console.log('[ChecklistVehicleTypes] checklistId at bulk toggle:', checklistId);
+
+        const realId = await onEnsureExists();
+        console.log('[ChecklistVehicleTypes] onEnsureExists returned realId:', realId);
+
+        if (!realId || filteredTypes.length === 0) {
+            console.log('[ChecklistVehicleTypes] Early return - realId:', realId, 'filteredTypes.length:', filteredTypes.length);
+            return;
+        }
+
+        // Update active ID if we got a new one
+        if (realId !== activeChecklistId) {
+            setActiveChecklistId(realId);
+        }
 
         const allLinked = filteredTypes.every(t => assignments.has(t.id));
         const targetState = !allLinked;
+        console.log('[ChecklistVehicleTypes] allLinked:', allLinked, 'targetState:', targetState);
 
         try {
             if (targetState) {
@@ -107,14 +138,19 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                 const toAdd = filteredTypes
                     .filter(t => !assignments.has(t.id))
                     .map(t => ({
-                        checklist_template_id: checklistId,
+                        checklist_template_id: realId, // Use real ID here!
                         vehicle_type_id: t.id
                     }));
 
+                console.log('[ChecklistVehicleTypes] toAdd with realId:', toAdd);
+
                 if (toAdd.length > 0) {
-                    const { error } = await supabase
+                    const { data, error } = await supabase
                         .from('vehicle_type_checklist_assignments')
-                        .upsert(toAdd, { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true });
+                        .upsert(toAdd, { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true })
+                        .select();
+
+                    console.log('[ChecklistVehicleTypes] upsert response - data:', data, 'error:', error);
 
                     if (error) throw error;
                 }
@@ -129,7 +165,7 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
                     .delete()
-                    .eq('checklist_template_id', checklistId)
+                    .eq('checklist_template_id', realId) // Use real ID here!
                     .in('vehicle_type_id', idsToRemove);
 
                 if (error) throw error;
@@ -175,7 +211,7 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-8 pb-8">
+            <div className="flex-1 px-8 pb-8">
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
                         <div className="col-span-10">Tipo de Veículo</div>

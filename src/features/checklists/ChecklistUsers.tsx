@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 
 interface ChecklistUsersProps {
     checklistId: string | null;
-    onEnsureExists: () => Promise<boolean>;
+    onEnsureExists: () => Promise<string | null>; // Now returns the actual ID after save
 }
 
 interface ChecklistPermission {
@@ -20,9 +20,10 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
     const [users, setUsers] = useState<any[]>([]);
     const [permissions, setPermissions] = useState<Record<string, ChecklistPermission>>({});
     const [loading, setLoading] = useState(true);
+    const [activeChecklistId, setActiveChecklistId] = useState<string | null>(checklistId); // Track real ID
 
     const fetchData = async () => {
-        if (!checklistId || checklistId.startsWith('chk_')) {
+        if (!checklistId) {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, full_name, role')
@@ -76,8 +77,13 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
     }, [checklistId]);
 
     const handleToggle = async (profileId: string, field: keyof Omit<ChecklistPermission, 'profile_id'>) => {
-        const exists = await onEnsureExists();
-        if (!exists || !checklistId) return;
+        const realId = await onEnsureExists();
+        if (!realId) return;
+
+        // Update active ID if we got a new one
+        if (realId !== activeChecklistId) {
+            setActiveChecklistId(realId);
+        }
 
         const current = permissions[profileId] || {
             profile_id: profileId,
@@ -98,7 +104,7 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
                 const { error } = await supabase
                     .from('profile_checklist_permissions')
                     .delete()
-                    .match({ profile_id: profileId, checklist_template_id: checklistId });
+                    .match({ profile_id: profileId, checklist_template_id: realId }); // Use realId
 
                 if (error) throw error;
 
@@ -110,7 +116,7 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
                     .from('profile_checklist_permissions')
                     .upsert({
                         profile_id: profileId,
-                        checklist_template_id: checklistId,
+                        checklist_template_id: realId, // Use realId
                         can_apply: updated.can_apply,
                         view_report: updated.view_report,
                         receive_email: updated.receive_email
@@ -130,8 +136,13 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
     };
 
     const handleBulkToggle = async (field: keyof Omit<ChecklistPermission, 'profile_id'>) => {
-        const exists = await onEnsureExists();
-        if (!exists || !checklistId || filteredUsers.length === 0) return;
+        const realId = await onEnsureExists();
+        if (!realId || filteredUsers.length === 0) return;
+
+        // Update active ID if we got a new one
+        if (realId !== activeChecklistId) {
+            setActiveChecklistId(realId);
+        }
 
         const currentStates = filteredUsers.map(u => {
             const perm = permissions[u.id];
@@ -152,7 +163,7 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
 
                 return {
                     profile_id: user.id,
-                    checklist_template_id: checklistId,
+                    checklist_template_id: realId, // Use realId
                     can_apply: field === 'can_apply' ? targetValue : current.can_apply,
                     view_report: field === 'view_report' ? targetValue : current.view_report,
                     receive_email: field === 'receive_email' ? targetValue : current.receive_email
@@ -164,7 +175,7 @@ const ChecklistUsers: React.FC<ChecklistUsersProps> = ({ checklistId, onEnsureEx
 
             if (toDelete.length > 0) {
                 await Promise.all(toDelete.map(u =>
-                    supabase.from('profile_checklist_permissions').delete().match({ profile_id: u.profile_id, checklist_template_id: checklistId })
+                    supabase.from('profile_checklist_permissions').delete().match({ profile_id: u.profile_id, checklist_template_id: realId }) // Use realId
                 ));
             }
 

@@ -73,10 +73,13 @@ const VehicleTypeChecklists: React.FC<VehicleTypeChecklistsProps> = ({ vehicleTy
                 newAssignments.delete(templateId);
                 setAssignments(newAssignments);
             } else {
-                // Add assignment
+                // Add assignment - use upsert to avoid duplicate key errors
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
-                    .insert({ vehicle_type_id: vehicleTypeId, checklist_template_id: templateId });
+                    .upsert(
+                        { vehicle_type_id: vehicleTypeId, checklist_template_id: templateId },
+                        { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true }
+                    );
 
                 if (error) throw error;
 
