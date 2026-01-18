@@ -30,16 +30,11 @@ const AccessProfileList: React.FC<AccessProfileListProps> = ({ onNew, onEdit }) 
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
 
-    // Mock data
+    // Access profiles based on actual user roles
     const profiles: AccessProfile[] = [
-        { id: '1', name: 'Administrador' },
-        { id: '2', name: 'GM - Diretor Financeiro' },
-        { id: '3', name: 'GM Green | Consultor de Vendas' },
-        { id: '4', name: 'GM Green | Faturamento' },
-        { id: '5', name: 'GM Green | Logística' },
-        { id: '6', name: 'GM Postos | Gerente de Pista' },
-        { id: '7', name: 'GM Postos | Gerente de Posto' },
-        { id: '8', name: 'GM Postos | Monitoramento' },
+        { id: 'ADMIN_MASTER', name: 'Admin Master' },
+        { id: 'GESTOR', name: 'Gestor' },
+        { id: 'MOTORISTA', name: 'Motorista' },
     ];
 
     const filteredProfiles = profiles.filter(p =>
