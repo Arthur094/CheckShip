@@ -66,11 +66,12 @@ const DashboardScreen: React.FC = () => {
     <div className="flex flex-col h-full bg-background-light relative min-h-screen">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 z-20">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center size-10 rounded-lg bg-primary/10 text-primary">
-            <span className="material-symbols-outlined material-symbols-filled">directions_boat</span>
+          {/* CS Box Logo */}
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary shadow-sm">
+            <span className="text-lg font-bold text-white">CS</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">CheckShip</h1>
+            <h1 className="text-lg font-bold text-slate-900 tracking-wide">CHECKSHIP</h1>
             {lastSync && (
               <p className="text-xs text-slate-500">
                 Sync: {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
