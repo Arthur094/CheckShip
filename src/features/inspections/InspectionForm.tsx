@@ -49,25 +49,43 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                 setVehicle(vhc);
 
                 // 3. Create or Resume Inspection
-                // For now, let's always create a new one for simplicity, or we could check for drafts.
-                // Let's create a draft status inspection.
                 const { data: { user } } = await supabase.auth.getUser();
 
-                const { data: insp, error: inspError } = await supabase
+                // Check for existing IN_PROGRESS inspection for this user/vehicle/template
+                const { data: existingInsp } = await supabase
                     .from('checklist_inspections')
-                    .insert({
-                        checklist_template_id: checklistId,
-                        vehicle_id: vehicleId,
-                        user_id: user?.id,
-                        status: 'in_progress',
-                        started_at: new Date().toISOString(),
-                        answers: {} // Initial empty JSON
-                    })
-                    .select()
-                    .single();
+                    .select('id, responses')
+                    .eq('checklist_template_id', checklistId)
+                    .eq('vehicle_id', vehicleId)
+                    .eq('inspector_id', user?.id)
+                    .eq('status', 'in_progress')
+                    .maybeSingle();
 
-                if (inspError) throw inspError;
-                setInspectionId(insp.id);
+                if (existingInsp) {
+                    console.log('🔄 Retomando inspeção existente:', existingInsp.id);
+                    setInspectionId(existingInsp.id);
+                    // Load existing answers if any
+                    if (existingInsp.responses) {
+                        setAnswers(existingInsp.responses);
+                    }
+                } else {
+                    console.log('✨ Criando nova inspeção...');
+                    const { data: insp, error: inspError } = await supabase
+                        .from('checklist_inspections')
+                        .insert({
+                            checklist_template_id: checklistId,
+                            vehicle_id: vehicleId,
+                            inspector_id: user?.id,
+                            status: 'in_progress',
+                            started_at: new Date().toISOString(),
+                            responses: {} // Initial empty JSON
+                        })
+                        .select()
+                        .single();
+
+                    if (inspError) throw inspError;
+                    setInspectionId(insp.id);
+                }
 
             } catch (error: any) {
                 console.error('Error initializing inspection:', error);
@@ -112,22 +130,29 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
         setSaving(true);
 
         try {
+            console.log('💾 Salvando inspeção...', { inspectionId, complete, answers });
+
             const payload = {
-                answers: answers, // Save the whole JSON object
+                responses: answers,
                 updated_at: new Date().toISOString(),
                 status: complete ? 'completed' : 'in_progress',
                 completed_at: complete ? new Date().toISOString() : null
             };
 
-            const { error } = await supabase
+            console.log('📦 Payload de envio:', payload);
+
+            const { data, error } = await supabase
                 .from('checklist_inspections')
                 .update(payload)
-                .eq('id', inspectionId);
+                .eq('id', inspectionId)
+                .select();
 
             if (error) throw error;
 
+            console.log('✅ Sucesso no update:', data);
+
             if (complete) {
-                alert('Inspeção finalizada com sucesso!');
+                alert('Inspeção finalizada com sucesso! Status atualizado para COMPLETED.');
                 onClose();
             } else {
                 // Just silent save or small toast could go here
@@ -245,6 +270,8 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
 }) => {
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
+    console.log('🟡 InspectionItem renderizado. isMandatoryAttachment:', item.mandatory_attachment, 'ItemId:', item.id);
+
     // Load existing image if available
     useEffect(() => {
         if (value?.imageUrl) {
@@ -318,21 +345,35 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        console.log('🔵 handleFileChange chamado');
+
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            console.log('📁 Arquivo selecionado:', file.name, file.type, file.size);
 
             // Show preview while uploading
             const previewUrl = URL.createObjectURL(file);
             setMediaPreview(previewUrl);
+            console.log('👁️ Preview URL criada:', previewUrl);
 
             try {
+                console.log('🔄 Iniciando compressão...');
                 // Compress image
                 const compressedBlob = await compressImage(file);
+                console.log('✅ Compressão concluída. Tamanho:', compressedBlob.size);
 
                 // Generate unique filename
                 const fileExt = 'jpg'; // Always save as JPEG after compression
                 const fileName = `${inspectionId}_${item.id}_${Date.now()}.${fileExt}`;
+                console.log('📝 Nome do arquivo gerado:', fileName);
+                console.log('🔑 InspectionId:', inspectionId);
+                console.log('🔑 ItemId:', item.id);
 
+                if (!inspectionId) {
+                    throw new Error('InspectionId não está definido! Não é possível fazer upload.');
+                }
+
+                console.log('☁️ Enviando para Supabase Storage...');
                 // Upload to Supabase Storage
                 const { data, error: uploadError } = await supabase.storage
                     .from('checklist-photos')
@@ -342,25 +383,39 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
                         contentType: 'image/jpeg'
                     });
 
+                console.log('📤 Resposta do upload:', { data, uploadError });
+
                 if (uploadError) throw uploadError;
 
+                console.log('🌐 Obtendo URL pública...');
                 // Get public URL
                 const { data: { publicUrl } } = supabase.storage
                     .from('checklist-photos')
                     .getPublicUrl(fileName);
 
+                console.log('✅ URL pública obtida:', publicUrl);
+
                 // Update preview with public URL
                 setMediaPreview(publicUrl);
 
                 // Save URL in answer
+                console.log('💾 Salvando URL no answer...');
                 onChange({ imageUrl: publicUrl });
 
                 alert('Imagem enviada com sucesso!');
+                console.log('🎉 Upload completo!');
             } catch (error: any) {
-                console.error('Erro ao fazer upload:', error);
+                console.error('❌ ERRO no upload:', error);
+                console.error('❌ Detalhes do erro:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
                 alert('Erro ao enviar imagem: ' + error.message);
                 setMediaPreview(null);
             }
+        } else {
+            console.log('⚠️ Nenhum arquivo selecionado');
         }
     };
 
@@ -553,6 +608,7 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
 
                     {/* --- MEDIA ATTACHMENTS (STRICT RULE) --- */}
                     {/* ONLY SHOW if isMandatoryAttachment is TRUE. */}
+                    {console.log('🔴 Verificando mandatory attachment. isMandatoryAttachment:', isMandatoryAttachment, 'item:', item.name)}
                     {isMandatoryAttachment && (
                         <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100 animate-in fade-in">
                             <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Evidência Obrigatória</p>
@@ -580,7 +636,10 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
                                             accept="image/*"
                                             capture="environment"
                                             className="hidden"
-                                            onChange={handleFileChange}
+                                            onChange={(e) => {
+                                                console.log('🟢 INPUT onChange disparado!');
+                                                handleFileChange(e);
+                                            }}
                                         />
                                     </label>
                                 </div>

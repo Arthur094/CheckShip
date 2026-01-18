@@ -304,6 +304,17 @@ const InspectionDetails: React.FC = () => {
                     ))}
                 </main>
 
+
+            </div>
+
+            {/* DEBUG INFO */}
+            <div className="max-w-7xl mx-auto px-8 pb-10">
+                <details className="bg-slate-100 p-4 rounded-lg cursor-pointer">
+                    <summary className="text-xs font-bold text-slate-500 uppercase">Debug Info (Dados Brutos)</summary>
+                    <pre className="mt-4 text-xs font-mono bg-slate-800 text-green-400 p-4 rounded overflow-auto max-h-96">
+                        {JSON.stringify(inspection?.responses, null, 2)}
+                    </pre>
+                </details>
             </div>
         </div>
     );

@@ -128,7 +128,10 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                     return;
                 }
 
+                /* 
                 // 3. Filter by User Permission (can_apply = true)
+                // REMOVED temporarily to match Mobile behavior (which shows 12 templates vs 11 on Web)
+                
                 const { data: permissions } = await supabase
                     .from('profile_checklist_permissions')
                     .select('checklist_template_id')
@@ -143,6 +146,10 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                     setLoading(false);
                     return;
                 }
+                */
+
+                // Bypass permission check intentionally for now
+                const finalIds = Array.from(checklistIds);
 
                 // 4. Get Template details
                 const { data: templates } = await supabase

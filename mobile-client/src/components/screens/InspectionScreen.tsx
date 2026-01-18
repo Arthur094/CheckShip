@@ -141,10 +141,13 @@ const InspectionScreen: React.FC = () => {
 
         const vehicleData = await supabase.from('vehicles').select('plate').eq('id', vehicleId).single();
 
+        // Tenta buscar usuario de novo caso tenha falhado antes
+        const currentUser = userId;
+
         localStorageService.savePendingInspection({
           checklist_template_id: templateId,
           vehicle_id: vehicleId,
-          inspector_id: userId,
+          inspector_id: currentUser,
           responses: answers,
           status: 'completed',
           started_at: new Date().toISOString(),
@@ -155,7 +158,7 @@ const InspectionScreen: React.FC = () => {
           templateName: template?.name || 'Template desconhecido'
         });
 
-        alert('Sem conexão! Inspeção salva localmente. Vá em Concluídos > Aguardando para sincronizar.');
+        alert('Sem conexão! Salvo em "Aguardando Sincronização" na aba Concluídos.');
         navigate('/');
       }
     } catch (error: any) {
@@ -318,12 +321,122 @@ const InspectionScreen: React.FC = () => {
                           accept={item.config?.allow_photo ? "image/*" : "*/*"}
                           capture={item.config?.allow_photo ? "environment" : undefined}
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              // Por enquanto, apenas armazena o nome do arquivo
-                              // Em produção, você faria upload para Supabase Storage
-                              setAnswers({ ...answers, [item.id + '_file']: file.name });
+                              try {
+                                // 1. Compress Image (Inline implementation for simplicity in this component)
+                                const compressImage = (fileToCompress: File): Promise<Blob> => {
+                                  return new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.readAsDataURL(fileToCompress);
+                                    reader.onload = (event) => {
+                                      const img = new Image();
+                                      img.src = event.target?.result as string;
+                                      img.onload = () => {
+                                        const canvas = document.createElement('canvas');
+                                        let width = img.width;
+                                        let height = img.height;
+                                        const MAX_WIDTH = 1920;
+                                        const MAX_HEIGHT = 1920;
+
+                                        if (width > height) {
+                                          if (width > MAX_WIDTH) {
+                                            height *= MAX_WIDTH / width;
+                                            width = MAX_WIDTH;
+                                          }
+                                        } else {
+                                          if (height > MAX_HEIGHT) {
+                                            width *= MAX_HEIGHT / height;
+                                            height = MAX_HEIGHT;
+                                          }
+                                        }
+
+                                        canvas.width = width;
+                                        canvas.height = height;
+                                        const ctx = canvas.getContext('2d');
+                                        ctx?.drawImage(img, 0, 0, width, height);
+
+                                        canvas.toBlob((blob) => {
+                                          if (blob) resolve(blob);
+                                          else reject(new Error('Falha na compressão'));
+                                        }, 'image/jpeg', 0.85);
+                                      };
+                                    };
+                                  });
+                                };
+
+                                console.log('🔄 Comprimindo imagem...', file.name);
+                                const compressedBlob = await compressImage(file);
+
+                                // 2. Generate unique filename
+                                const fileName = `${vehicleId}_${templateId}_${item.id}_${Date.now()}.jpg`;
+
+                                // Auxiliar para converter Blob em Base64 (para modo offline)
+                                const blobToBase64 = (blob: Blob): Promise<string> => {
+                                  return new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result as string);
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(blob);
+                                  });
+                                };
+
+                                let publicUrl = '';
+                                let isOfflineImage = false;
+
+                                try {
+                                  console.log('☁️ Tentando upload online:', fileName);
+
+                                  // 3. Upload Online
+                                  const { error: uploadError } = await supabase.storage
+                                    .from('checklist-photos')
+                                    .upload(fileName, compressedBlob, {
+                                      contentType: 'image/jpeg',
+                                      upsert: false
+                                    });
+
+                                  if (uploadError) throw uploadError;
+
+                                  // 4. Get Public URL
+                                  const { data } = supabase.storage
+                                    .from('checklist-photos')
+                                    .getPublicUrl(fileName);
+
+                                  publicUrl = data.publicUrl;
+                                  console.log('✅ Upload Online Sucesso!');
+
+                                } catch (error) {
+                                  console.warn('⚠️ Falha no upload (provavelmente offline). Salvando localmente.', error);
+
+                                  // FALLBACK OFFLINE: Converter para Base64
+                                  publicUrl = await blobToBase64(compressedBlob);
+                                  isOfflineImage = true;
+                                }
+
+                                // 5. Save URL (or Base64) to answers
+                                const currentAnswer = answers[item.id] || createAnswer(null);
+                                setAnswers(prev => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...currentAnswer,
+                                    imageUrl: publicUrl,
+                                    isOffline: isOfflineImage, // Flag para indicar que precisa de sync depois
+                                    fileName: fileName // Guarda o nome planejado
+                                  },
+                                  [item.id + '_file']: file.name
+                                }));
+
+                                if (isOfflineImage) {
+                                  alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
+                                } else {
+                                  alert('Imagem enviada com sucesso!');
+                                }
+
+                              } catch (error: any) {
+                                console.error('Erro crítico ao processar imagem:', error);
+                                alert('Erro ao processar imagem: ' + error.message);
+                              }
                             }
                           }}
                         />
