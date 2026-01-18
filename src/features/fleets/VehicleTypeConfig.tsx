@@ -88,7 +88,7 @@ const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialDa
             case 'profile':
                 return <VehicleTypeForm data={formData} onChange={handleFieldChange} />;
             case 'units':
-                return <VehicleTypeUnits />;
+                return <VehicleTypeUnits vehicleTypeId={formData.id} onEnsureExists={() => performSave(true)} />;
             case 'checklists':
                 return <VehicleTypeChecklists vehicleTypeId={formData.id} onEnsureExists={() => performSave(true)} />;
             default:
@@ -126,7 +126,7 @@ const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialDa
                         onClick={() => setActiveTab('units')}
                         className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'units' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
-                        Unidades
+                        Veículos
                     </button>
                     <button
                         onClick={() => setActiveTab('checklists')}
