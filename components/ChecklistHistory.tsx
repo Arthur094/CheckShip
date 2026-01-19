@@ -136,7 +136,42 @@ const ChecklistHistory: React.FC = () => {
       console.log('📊 fetchHistory raw data:', data);
       console.log('📊 fetchHistory count:', data?.length);
 
-      // Post-process for issues count
+      // Fetch related data separately
+      const inspectorIds = [...new Set((data || []).map((d: any) => d.inspector_id).filter(Boolean))];
+      const vehicleIds = [...new Set((data || []).map((d: any) => d.vehicle_id).filter(Boolean))];
+      const templateIds = [...new Set((data || []).map((d: any) => d.checklist_template_id).filter(Boolean))];
+
+      // Fetch users (profiles)
+      const usersMap: Record<string, any> = {};
+      if (inspectorIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('profiles')
+          .select('id, full_name, role')
+          .in('id', inspectorIds);
+        (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
+      }
+
+      // Fetch vehicles
+      const vehiclesMap: Record<string, any> = {};
+      if (vehicleIds.length > 0) {
+        const { data: vehiclesData } = await supabase
+          .from('vehicles')
+          .select('id, plate, model, vehicle_type_id')
+          .in('id', vehicleIds);
+        (vehiclesData || []).forEach((v: any) => { vehiclesMap[v.id] = v; });
+      }
+
+      // Fetch templates
+      const templatesMap: Record<string, any> = {};
+      if (templateIds.length > 0) {
+        const { data: templatesData } = await supabase
+          .from('checklist_templates')
+          .select('id, name')
+          .in('id', templateIds);
+        (templatesData || []).forEach((t: any) => { templatesMap[t.id] = t; });
+      }
+
+      // Post-process and merge
       const processed = (data || []).map((item: any) => {
         let issues = 0;
         if (item.responses) {
@@ -153,9 +188,9 @@ const ChecklistHistory: React.FC = () => {
           analysis_total_steps: item.analysis_total_steps,
           started_at: item.started_at,
           completed_at: item.completed_at,
-          user: item.user,
-          vehicle: item.vehicle,
-          template: item.template,
+          user: usersMap[item.inspector_id] || null,
+          vehicle: vehiclesMap[item.vehicle_id] || null,
+          template: templatesMap[item.checklist_template_id] || null,
           critical_count: issues
         };
       });

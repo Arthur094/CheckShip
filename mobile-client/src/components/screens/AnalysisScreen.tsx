@@ -25,10 +25,34 @@ const AnalysisScreen: React.FC = () => {
     const [items, setItems] = useState<AnalysisItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState<AnalysisItem | null>(null);
+    const [syncing, setSyncing] = useState(false);
+    const [lastSync, setLastSync] = useState<string | null>(null);
 
     useEffect(() => {
+        const sync = cacheService.getLastSync();
+        setLastSync(sync);
         fetchAnalysisItems();
     }, []);
+
+    const handleSync = async () => {
+        if (syncing) return;
+        setSyncing(true);
+        try {
+            const userId = cacheService.getUserId();
+            if (userId) {
+                await cacheService.downloadAllData(userId, supabase);
+                const sync = cacheService.getLastSync();
+                setLastSync(sync);
+                await fetchAnalysisItems();
+                alert('✅ Dados sincronizados com sucesso!');
+            }
+        } catch (error) {
+            console.error('Erro ao sincronizar:', error);
+            alert('❌ Erro ao sincronizar dados');
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     const fetchAnalysisItems = async () => {
         setLoading(true);
@@ -94,11 +118,37 @@ const AnalysisScreen: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-background-light pb-20">
-            {/* Header */}
-            <header className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10">
-                <h1 className="font-bold text-lg text-slate-800">Análise de Checklists</h1>
-                <p className="text-xs text-slate-500">Acompanhe o status de aprovação das suas inspeções</p>
+            {/* Header with CheckShip logo and sync button */}
+            <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 z-20 sticky top-0">
+                <div className="flex items-center gap-3">
+                    {/* CS Box Logo */}
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary shadow-sm">
+                        <span className="text-lg font-bold text-white">CS</span>
+                    </div>
+                    <div>
+                        <h1 className="text-lg font-bold text-slate-900 tracking-wide">CHECKSHIP</h1>
+                        {lastSync && (
+                            <p className="text-xs text-slate-500">
+                                Sync: {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                        )}
+                    </div>
+                </div>
+                <button
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="size-10 flex items-center justify-center disabled:opacity-50"
+                    title="Sincronizar dados"
+                >
+                    <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>sync</span>
+                </button>
             </header>
+
+            {/* Subtitle */}
+            <div className="px-4 pt-4 pb-2">
+                <h2 className="font-bold text-slate-800">Análise de Checklists</h2>
+                <p className="text-xs text-slate-500">Acompanhe o status de aprovação das suas inspeções</p>
+            </div>
 
             {/* Content */}
             <main className="p-4 space-y-3">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -19,9 +19,26 @@ import InspectionDetails from './src/features/inspections/InspectionDetails';
 
 
 
+interface MainLayoutProps {
+  initialTab?: string;
+}
 
-const MainLayout: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if there is a target tab passed in the navigation state
+    if (location.state && (location.state as any).targetTab) {
+      setActiveTab((location.state as any).targetTab);
+      // Clear the state so it doesn't persist on refresh/back? 
+      // Actually navigate replaces history state usually, but let's keep it simple.
+    } else {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, location.state]);
+
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
 
   // Inspection State
@@ -105,39 +122,7 @@ const MainLayout: React.FC = () => {
 
       {/* Main Content Wrapper */}
       <main className="flex-1 ml-72 flex flex-col min-w-0">
-        {/* Top Utility Bar */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-50">
-          <div className="flex items-center gap-2">
-            <div className="md:flex hidden items-center bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-900 transition-all">
-              <SearchIcon size={16} className="text-slate-400" />
-              <input
-                type="text"
-                placeholder="Pesquisa rápida..."
-                className="bg-transparent border-none text-sm outline-none px-2 w-48"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-blue-900 hover:bg-slate-50 rounded-full transition-all relative">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-            <button className="p-2 text-slate-400 hover:text-blue-900 hover:bg-slate-50 rounded-full transition-all">
-              <HelpCircle size={20} />
-            </button>
-            <div className="h-6 w-px bg-slate-200 mx-2"></div>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs font-bold text-slate-800 leading-none">Admin Master</p>
-                <p className="text-xs text-slate-400 font-medium font-mono">CheckShip Corp</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                AM
-              </div>
-            </div>
-          </div>
-        </header>
+        {/* Header removed per user request */}
 
         {/* Dynamic Page Content */}
         <div className="flex-1 overflow-y-auto">
@@ -169,6 +154,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<MainLayout />} />
+          <Route path="/ckrealizados" element={<MainLayout initialTab="history" />} />
           <Route path="/inspections/:id" element={<InspectionDetails />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>

@@ -219,11 +219,11 @@ const InspectionDetails: React.FC = () => {
                 <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
                     <div className="flex items-center justify-between mb-6">
                         <button
-                            onClick={() => navigate('/dashboard')}
+                            onClick={() => navigate('/ckrealizados')}
                             className="flex items-center gap-2 text-slate-500 hover:text-blue-900 transition-colors text-sm font-bold uppercase tracking-wider"
                         >
                             <ArrowLeft size={18} />
-                            Voltar ao Painel
+                            Voltar aos Checklists
                         </button>
 
                         <div className="flex items-center gap-4">
@@ -307,23 +307,23 @@ const InspectionDetails: React.FC = () => {
             {/* ANALYSIS STATUS BANNER - Show for analyzed inspections */}
             {(inspection.analysis_status === 'approved' || inspection.analysis_status === 'rejected' || inspection.status === 'pending') && (
                 <div className={`border-b ${inspection.analysis_status === 'approved' ? 'bg-green-50 border-green-100' :
-                        inspection.analysis_status === 'rejected' ? 'bg-red-50 border-red-100' :
-                            'bg-amber-50 border-amber-100'
+                    inspection.analysis_status === 'rejected' ? 'bg-red-50 border-red-100' :
+                        'bg-amber-50 border-amber-100'
                     }`}>
                     <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
                         <div className="flex items-center justify-between gap-4 flex-wrap">
                             <div className="flex items-center gap-3">
                                 <span className={`material-symbols-outlined text-2xl ${inspection.analysis_status === 'approved' ? 'text-green-600' :
-                                        inspection.analysis_status === 'rejected' ? 'text-red-600' :
-                                            'text-amber-600'
+                                    inspection.analysis_status === 'rejected' ? 'text-red-600' :
+                                        'text-amber-600'
                                     }`}>
                                     {inspection.analysis_status === 'approved' ? 'check_circle' :
                                         inspection.analysis_status === 'rejected' ? 'cancel' : 'hourglass_top'}
                                 </span>
                                 <div>
                                     <p className={`text-sm font-bold ${inspection.analysis_status === 'approved' ? 'text-green-700' :
-                                            inspection.analysis_status === 'rejected' ? 'text-red-700' :
-                                                'text-amber-700'
+                                        inspection.analysis_status === 'rejected' ? 'text-red-700' :
+                                            'text-amber-700'
                                         }`}>
                                         {inspection.analysis_status === 'approved' ? 'Análise Aprovada' :
                                             inspection.analysis_status === 'rejected' ? 'Análise Reprovada' :
