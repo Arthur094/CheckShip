@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, User, Truck, MapPin, CheckCircle, AlertTriangle, XCircle, ChevronRight, Camera, FileText, FileDown } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Calendar, User, Truck, MapPin, CheckCircle, AlertTriangle, XCircle, ChevronRight, Camera, FileText, FileDown, CheckCircle2, XOctagon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -8,10 +8,15 @@ import html2pdf from 'html2pdf.js';
 const InspectionDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const isAnalysisMode = searchParams.get('mode') === 'analysis';
     const [loading, setLoading] = useState(true);
     const [inspection, setInspection] = useState<any>(null);
     const [structure, setStructure] = useState<any>(null);
     const [activeAreaId, setActiveAreaId] = useState<string>('');
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectReason, setRejectReason] = useState('');
+    const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
         fetchInspectionDetails();
@@ -94,6 +99,109 @@ const InspectionDetails: React.FC = () => {
         html2pdf().set(opt).from(element).save();
     };
 
+    const handleApprove = async () => {
+        if (!inspection || !id) return;
+        if (!window.confirm('Confirma a aprovação deste checklist?')) return;
+
+        setProcessing(true);
+        try {
+            const { data: userData } = await supabase.auth.getUser();
+            const userId = userData?.user?.id;
+
+            const currentStep = (inspection.analysis_current_step || 0) + 1;
+            const totalSteps = inspection.analysis_total_steps || 1;
+            const isCompleted = currentStep >= totalSteps;
+
+            const updateData: any = {
+                analysis_current_step: currentStep,
+                updated_at: new Date().toISOString(),
+            };
+
+            // First or second approval
+            if (currentStep === 1) {
+                updateData.analysis_first_result = 'approved';
+                updateData.analysis_first_by = userId;
+                updateData.analysis_first_at = new Date().toISOString();
+            } else if (currentStep === 2) {
+                updateData.analysis_second_result = 'approved';
+                updateData.analysis_second_by = userId;
+                updateData.analysis_second_at = new Date().toISOString();
+            }
+
+            // If all approvals done, mark as completed
+            if (isCompleted) {
+                updateData.analysis_status = 'approved';
+                updateData.status = 'completed';
+            }
+
+            const { error } = await supabase
+                .from('checklist_inspections')
+                .update(updateData)
+                .eq('id', id);
+
+            if (error) throw error;
+
+            alert('✅ Checklist aprovado com sucesso!');
+            navigate(-1);
+        } catch (error: any) {
+            console.error('Erro ao aprovar:', error);
+            alert('Erro ao aprovar: ' + error.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleReject = async () => {
+        if (!inspection || !id || !rejectReason.trim()) {
+            alert('Por favor, informe uma justificativa para a reprovação.');
+            return;
+        }
+
+        setProcessing(true);
+        try {
+            const { data: userData } = await supabase.auth.getUser();
+            const userId = userData?.user?.id;
+
+            const currentStep = (inspection.analysis_current_step || 0) + 1;
+
+            const updateData: any = {
+                analysis_status: 'rejected',
+                status: 'rejected',
+                analysis_current_step: currentStep,
+                updated_at: new Date().toISOString(),
+            };
+
+            // Record who rejected and why
+            if (currentStep === 1) {
+                updateData.analysis_first_result = 'rejected';
+                updateData.analysis_first_by = userId;
+                updateData.analysis_first_at = new Date().toISOString();
+                updateData.analysis_first_reason = rejectReason;
+            } else if (currentStep === 2) {
+                updateData.analysis_second_result = 'rejected';
+                updateData.analysis_second_by = userId;
+                updateData.analysis_second_at = new Date().toISOString();
+                updateData.analysis_second_reason = rejectReason;
+            }
+
+            const { error } = await supabase
+                .from('checklist_inspections')
+                .update(updateData)
+                .eq('id', id);
+
+            if (error) throw error;
+
+            alert('❌ Checklist reprovado.');
+            navigate(-1);
+        } catch (error: any) {
+            console.error('Erro ao reprovar:', error);
+            alert('Erro ao reprovar: ' + error.message);
+        } finally {
+            setProcessing(false);
+            setShowRejectModal(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -120,9 +228,11 @@ const InspectionDetails: React.FC = () => {
 
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-3">
-                                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                    inspection.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                                        'bg-yellow-100 text-yellow-700'
                                     }`}>
-                                    {inspection.status === 'completed' ? 'Concluído' : 'Em Andamento'}
+                                    {inspection.status === 'completed' ? 'Concluído' : inspection.status === 'pending' ? 'Em Análise' : 'Em Andamento'}
                                 </span>
                                 <span className="text-slate-300">|</span>
                                 <span className="text-sm font-bold text-slate-600">ID: {inspection.code || inspection.id.substr(0, 8)}</span>
@@ -193,6 +303,53 @@ const InspectionDetails: React.FC = () => {
                     </div>
                 </div>
             </header>
+
+            {/* ANALYSIS STATUS BANNER - Show for analyzed inspections */}
+            {(inspection.analysis_status === 'approved' || inspection.analysis_status === 'rejected' || inspection.status === 'pending') && (
+                <div className={`border-b ${inspection.analysis_status === 'approved' ? 'bg-green-50 border-green-100' :
+                        inspection.analysis_status === 'rejected' ? 'bg-red-50 border-red-100' :
+                            'bg-amber-50 border-amber-100'
+                    }`}>
+                    <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <div className="flex items-center gap-3">
+                                <span className={`material-symbols-outlined text-2xl ${inspection.analysis_status === 'approved' ? 'text-green-600' :
+                                        inspection.analysis_status === 'rejected' ? 'text-red-600' :
+                                            'text-amber-600'
+                                    }`}>
+                                    {inspection.analysis_status === 'approved' ? 'check_circle' :
+                                        inspection.analysis_status === 'rejected' ? 'cancel' : 'hourglass_top'}
+                                </span>
+                                <div>
+                                    <p className={`text-sm font-bold ${inspection.analysis_status === 'approved' ? 'text-green-700' :
+                                            inspection.analysis_status === 'rejected' ? 'text-red-700' :
+                                                'text-amber-700'
+                                        }`}>
+                                        {inspection.analysis_status === 'approved' ? 'Análise Aprovada' :
+                                            inspection.analysis_status === 'rejected' ? 'Análise Reprovada' :
+                                                `Em Análise (${inspection.analysis_current_step || 0}/${inspection.analysis_total_steps || 1})`}
+                                    </p>
+                                    {inspection.analysis_first_at && (
+                                        <p className="text-xs text-slate-500">
+                                            {new Date(inspection.analysis_first_at).toLocaleString('pt-BR')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Show rejection reason if rejected */}
+                            {inspection.analysis_status === 'rejected' && (inspection.analysis_first_reason || inspection.analysis_second_reason) && (
+                                <div className="bg-red-100 border border-red-200 rounded-lg px-4 py-2 max-w-lg">
+                                    <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Motivo da Reprovação:</p>
+                                    <p className="text-sm text-red-700">
+                                        {inspection.analysis_first_reason || inspection.analysis_second_reason}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* CONTENT LAYOUT */}
             <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 flex gap-8">
@@ -306,6 +463,68 @@ const InspectionDetails: React.FC = () => {
 
 
             </div>
+
+            {/* Analysis Footer - Only show in analysis mode with pending status */}
+            {isAnalysisMode && inspection.status === 'pending' && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
+                    <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-slate-600">Etapa</span>
+                            <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-black">
+                                {inspection.analysis_current_step || 0}/{inspection.analysis_total_steps || 1}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => setShowRejectModal(true)}
+                                disabled={processing}
+                                className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+                            >
+                                <XOctagon size={18} />
+                                REPROVAR
+                            </button>
+                            <button
+                                onClick={handleApprove}
+                                disabled={processing}
+                                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+                            >
+                                <CheckCircle2 size={18} />
+                                APROVAR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Modal */}
+            {showRejectModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setShowRejectModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-slate-800 mb-4">Justificativa da Reprovação</h3>
+                        <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="Informe o motivo da reprovação..."
+                            className="w-full h-32 p-4 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
+                        />
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                onClick={() => setShowRejectModal(false)}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-bold transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                disabled={processing || !rejectReason.trim()}
+                                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                            >
+                                {processing ? 'Processando...' : 'Confirmar Reprovação'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* DEBUG INFO */}
             <div className="max-w-7xl mx-auto px-8 pb-10">

@@ -9,6 +9,7 @@ import TemplateSelectScreen from './components/screens/TemplateSelectScreen';
 import InspectionScreen from './components/screens/InspectionScreen';
 import CompletedScreen from './components/screens/CompletedScreen';
 import ProfileScreen from './components/screens/ProfileScreen';
+import AnalysisScreen from './components/screens/AnalysisScreen';
 
 const AuthContext = createContext<{
   session: any | null;
@@ -43,6 +44,7 @@ const AppRoutes = () => {
       <Route path="/template/:vehicleId" element={<TemplateSelectScreen />} />
       <Route path="/inspection/:vehicleId/:templateId" element={<InspectionScreen />} />
       <Route path="/completed" element={<CompletedScreen />} />
+      <Route path="/analysis" element={<AnalysisScreen />} />
       <Route path="/profile" element={<ProfileScreen />} />
     </Routes>
   );

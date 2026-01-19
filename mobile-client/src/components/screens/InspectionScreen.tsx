@@ -99,12 +99,22 @@ const InspectionScreen: React.FC = () => {
         userId = cachedUserId;
       }
 
+      // Determine status based on analysis workflow
+      const requiresAnalysis = template?.requires_analysis === true;
+      const inspectionStatus = requiresAnalysis ? 'pending' : 'completed';
+      const analysisStatus = requiresAnalysis ? 'pending' : null;
+      const analysisTotalSteps = template?.analysis_approvals_count || 1;
+
       const inspectionData = {
         checklist_template_id: templateId,
         vehicle_id: vehicleId,
         inspector_id: userId,
         responses: answers,
-        status: 'completed',
+        status: inspectionStatus,
+        // Analysis workflow fields
+        analysis_status: analysisStatus,
+        analysis_current_step: 0,
+        analysis_total_steps: requiresAnalysis ? analysisTotalSteps : null,
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
@@ -129,7 +139,11 @@ const InspectionScreen: React.FC = () => {
         }
 
         console.log('Salvo online:', data);
-        alert('Inspeção finalizada e sincronizada!');
+        if (requiresAnalysis) {
+          alert('✅ Inspeção finalizada! Aguardando análise do gestor.');
+        } else {
+          alert('✅ Inspeção finalizada e sincronizada!');
+        }
         navigate('/');
       } catch (onlineError: any) {
         console.warn('Falha online, salvando localmente...', onlineError);
@@ -149,7 +163,11 @@ const InspectionScreen: React.FC = () => {
           vehicle_id: vehicleId,
           inspector_id: currentUser,
           responses: answers,
-          status: 'completed',
+          status: inspectionStatus,
+          // Analysis workflow fields (for when synced later)
+          analysis_status: analysisStatus,
+          analysis_current_step: 0,
+          analysis_total_steps: requiresAnalysis ? analysisTotalSteps : null,
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           created_at: new Date().toISOString(),

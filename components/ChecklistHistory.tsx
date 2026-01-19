@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Download, Trash2, CheckCircle2, Eye, AlertTriangle, FileText, MoreVertical, Calendar, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Download, Trash2, CheckCircle2, Eye, AlertTriangle, FileText, MoreVertical, Calendar, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ClipboardCheck } from 'lucide-react';
 import { supabase } from '../src/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import ExportModal from './ExportModal';
@@ -53,10 +53,10 @@ const ChecklistHistory: React.FC = () => {
 
   // Filter State
   const [filters, setFilters] = useState({
-    status: ['Finalizado'],
+    status: [] as string[],   // Empty = all statuses
     periodType: 'started_at',
-    startDate: '2026-01-01',
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: '',            // Empty = no start date filter
+    endDate: '',              // Empty = no end date filter  
     code: '',
     vehicleTypes: [] as string[],
     vehicles: [] as string[],
@@ -108,26 +108,33 @@ const ChecklistHistory: React.FC = () => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
+      // Debug: Check auth state
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('🔐 Auth session:', sessionData?.session ? 'LOGGED IN' : 'NOT LOGGED IN');
+      console.log('🔐 User ID:', sessionData?.session?.user?.id);
+      console.log('🔐 Access Token exists:', !!sessionData?.session?.access_token);
+
       const { data, error } = await supabase
         .from('checklist_inspections')
         .select(`
           id,
           status,
+          analysis_status,
+          analysis_current_step,
+          analysis_total_steps,
           started_at,
           completed_at,
           responses,
-          vehicle:vehicles!vehicle_id (
-            id,
-            plate,
-            model,
-            vehicle_types!vehicle_type_id (name, id)
-          ),
-          template:checklist_templates!checklist_template_id (name, id),
-          user:profiles!inspector_id (full_name, role, id)
+          vehicle_id,
+          checklist_template_id,
+          inspector_id
         `)
         .order('started_at', { ascending: false });
 
       if (error) throw error;
+
+      console.log('📊 fetchHistory raw data:', data);
+      console.log('📊 fetchHistory count:', data?.length);
 
       // Post-process for issues count
       const processed = (data || []).map((item: any) => {
@@ -141,6 +148,9 @@ const ChecklistHistory: React.FC = () => {
         return {
           id: item.id,
           status: item.status,
+          analysis_status: item.analysis_status,
+          analysis_current_step: item.analysis_current_step,
+          analysis_total_steps: item.analysis_total_steps,
           started_at: item.started_at,
           completed_at: item.completed_at,
           user: item.user,
@@ -150,6 +160,7 @@ const ChecklistHistory: React.FC = () => {
         };
       });
 
+      console.log('📊 fetchHistory processed:', processed);
       setHistory(processed);
 
     } catch (error: any) {
@@ -164,11 +175,26 @@ const ChecklistHistory: React.FC = () => {
     return history.filter(item => {
       // 1. Status
       if (filters.status.length > 0) {
-        // Map UI status labels to internal keys if needed, or simple match
-        // UI: 'Finalizado' -> 'completed', 'Em Andamento' -> 'in_progress'
-        const itemStatus = item.status === 'completed' ? 'Finalizado' : item.status === 'in_progress' ? 'Em Andamento' : item.status;
-        const mappedFilters = filters.status.map(s => s === 'Finalizado' ? 'completed' : s === 'Em Andamento' ? 'in_progress' : s);
-        if (!mappedFilters.includes(item.status) && !filters.status.includes(itemStatus)) return false;
+        // Convert item status to UI label
+        let itemStatusLabel = '';
+        if (item.status === 'completed') {
+          // Check if it was approved via analysis
+          if (item.analysis_status === 'approved') {
+            itemStatusLabel = 'Aprovado';
+          } else {
+            itemStatusLabel = 'Finalizado';
+          }
+        } else if (item.status === 'rejected') {
+          itemStatusLabel = 'Reprovado';
+        } else if (item.status === 'pending') {
+          itemStatusLabel = 'Em Análise';
+        } else if (item.status === 'in_progress') {
+          itemStatusLabel = 'Em Andamento';
+        } else {
+          itemStatusLabel = item.status;
+        }
+
+        if (!filters.status.includes(itemStatusLabel)) return false;
       }
 
       // 2. Period
@@ -329,7 +355,10 @@ const ChecklistHistory: React.FC = () => {
 
   const statusOptions = [
     { id: 'Finalizado', label: 'Finalizado' },
-    { id: 'Em Andamento', label: 'Em Andamento' }
+    { id: 'Em Andamento', label: 'Em Andamento' },
+    { id: 'Em Análise', label: 'Em Análise' },
+    { id: 'Aprovado', label: 'Aprovado' },
+    { id: 'Reprovado', label: 'Reprovado' }
   ];
 
   const platformOptions = [
@@ -551,12 +580,33 @@ const ChecklistHistory: React.FC = () => {
 
                     {/* Status */}
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${row.status === 'completed' || row.status === 'Aprovado' ? 'bg-green-100 text-green-700' :
-                        row.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                          'bg-slate-100 text-slate-600'
-                        }`}>
-                        {row.status === 'completed' ? 'Finalizado' : row.status}
-                      </span>
+                      {(() => {
+                        let badgeClass = 'bg-slate-100 text-slate-600';
+                        let badgeText = row.status;
+
+                        if (row.status === 'completed' && row.analysis_status === 'approved') {
+                          badgeClass = 'bg-green-100 text-green-700';
+                          badgeText = 'Aprovado';
+                        } else if (row.status === 'completed') {
+                          badgeClass = 'bg-green-100 text-green-700';
+                          badgeText = 'Finalizado';
+                        } else if (row.status === 'rejected') {
+                          badgeClass = 'bg-red-100 text-red-700';
+                          badgeText = 'Reprovado';
+                        } else if (row.status === 'pending') {
+                          badgeClass = 'bg-amber-100 text-amber-700';
+                          badgeText = `Em Análise (${row.analysis_current_step || 0}/${row.analysis_total_steps || 1})`;
+                        } else if (row.status === 'in_progress') {
+                          badgeClass = 'bg-blue-100 text-blue-700';
+                          badgeText = 'Em Andamento';
+                        }
+
+                        return (
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${badgeClass}`}>
+                            {badgeText}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     {/* Code */}
@@ -631,6 +681,19 @@ const ChecklistHistory: React.FC = () => {
                           {/* Dropdown Menu */}
                           {activeMenuId === row.id && (
                             <div className="absolute right-0 top-10 w-40 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2 animate-in zoom-in-95 duration-200 header-dropdown">
+                              {/* Analisar - only show for pending status */}
+                              {row.status === 'pending' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    navigate(`/inspections/${row.id}?mode=analysis`);
+                                  }}
+                                  className="w-full text-left px-4 py-3 text-xs font-bold text-amber-600 hover:bg-amber-50 flex items-center gap-2 transition-colors"
+                                >
+                                  <ClipboardCheck size={16} /> Analisar
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

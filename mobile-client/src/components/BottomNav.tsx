@@ -19,6 +19,14 @@ const BottomNav: React.FC = () => {
         </button>
 
         <button
+          onClick={() => navigate('/analysis')}
+          className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${isActive('/analysis') ? 'text-amber-600' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <span className={`material-symbols-outlined ${isActive('/analysis') ? 'material-symbols-filled' : ''}`}>assignment_turned_in</span>
+          <span className="text-[10px] font-medium">Análise</span>
+        </button>
+
+        <button
           onClick={() => navigate('/completed')}
           className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${isActive('/completed') ? 'text-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >

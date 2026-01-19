@@ -25,7 +25,9 @@ import {
   Settings,
   Search,
   Filter,
-  Trash2
+  Trash2,
+  Users,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -198,6 +200,16 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
   const [selectedVehicleTypes, setSelectedVehicleTypes] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
+  // Analysis Workflow (Fluxo de Análise)
+  const [requiresAnalysis, setRequiresAnalysis] = useState(false);
+  const [analysisApprovalsCount, setAnalysisApprovalsCount] = useState<1 | 2>(1);
+  const [analysisFirstApprover, setAnalysisFirstApprover] = useState<string | null>(null);
+  const [analysisSecondApprover, setAnalysisSecondApprover] = useState<string | null>(null);
+  const [analysisHasTimer, setAnalysisHasTimer] = useState(false);
+  const [analysisTimerMinutes, setAnalysisTimerMinutes] = useState<number | null>(null);
+  const [availableApprovers, setAvailableApprovers] = useState<any[]>([]);
+  const [showApproverModal, setShowApproverModal] = useState<'first' | 'second' | null>(null);
+
   // Structure states
   const [areas, setAreas] = useState<Area[]>([]);
   const [isAddingArea, setIsAddingArea] = useState(false);
@@ -243,6 +255,14 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setPdfHeaderImage((initialTemplate as any).pdf_header_image || '');
       setPdfTitle((initialTemplate as any).pdf_title || '');
 
+      // Load Analysis Workflow fields
+      setRequiresAnalysis((initialTemplate as any).requires_analysis || false);
+      setAnalysisApprovalsCount((initialTemplate as any).analysis_approvals_count || 1);
+      setAnalysisFirstApprover((initialTemplate as any).analysis_first_approver || null);
+      setAnalysisSecondApprover((initialTemplate as any).analysis_second_approver || null);
+      setAnalysisHasTimer((initialTemplate as any).analysis_has_timer || false);
+      setAnalysisTimerMinutes((initialTemplate as any).analysis_timer_minutes || null);
+
       if (initialTemplate.structure?.areas) {
         setAreas(initialTemplate.structure.areas as any);
       }
@@ -267,9 +287,35 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setAreas([]);
       setPdfHeaderImage('');
       setPdfTitle('');
+      // Reset analysis fields
+      setRequiresAnalysis(false);
+      setAnalysisApprovalsCount(1);
+      setAnalysisFirstApprover(null);
+      setAnalysisSecondApprover(null);
+      setAnalysisHasTimer(false);
+      setAnalysisTimerMinutes(null);
     }
     setActiveTab('DADOS CADASTRAIS');
   }, [initialTemplate]);
+
+  // Fetch available approvers (users with approval permission or all managers)
+  useEffect(() => {
+    const fetchApprovers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .in('role', ['GESTOR', 'ADMIN_MASTER'])
+          .order('full_name');
+
+        if (error) throw error;
+        setAvailableApprovers(data || []);
+      } catch (err) {
+        console.error('Erro ao carregar aprovadores:', err);
+      }
+    };
+    fetchApprovers();
+  }, []);
 
 
 
@@ -355,6 +401,13 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         // PDF fields commented out until database migration is applied
         // pdf_header_image: pdfHeaderImage || null,
         // pdf_title: pdfTitle || null,
+        // Analysis Workflow fields
+        requires_analysis: requiresAnalysis,
+        analysis_approvals_count: analysisApprovalsCount,
+        analysis_first_approver: analysisFirstApprover,
+        analysis_second_approver: analysisApprovalsCount === 2 ? analysisSecondApprover : null,
+        analysis_has_timer: analysisHasTimer,
+        analysis_timer_minutes: analysisHasTimer ? analysisTimerMinutes : null,
         updated_at: new Date().toISOString()
       };
 
@@ -783,7 +836,139 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
             />
           </div>
         </Accordion>
-      </div>
+
+        {/* Fluxo de Análise (Analysis Workflow) */}
+        <Accordion title="Fluxo de Análise" isOpen={!!openPanels.analysis} onToggle={() => togglePanel('analysis')}>
+          <div className="space-y-6">
+            {/* Main Toggle */}
+            <Toggle
+              label="Checklists aplicados devem passar por análise"
+              description="Quando ativado, checklists concluídos terão status 'Em Análise' até serem aprovados"
+              active={requiresAnalysis}
+              onChange={(val) => setRequiresAnalysis(val)}
+            />
+
+            {requiresAnalysis && (
+              <div className="space-y-6 pl-4 border-l-2 border-blue-200 ml-2">
+                {/* Approval Count */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase">
+                    Quantidade de aprovações necessárias
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="approvalCount"
+                        checked={analysisApprovalsCount === 1}
+                        onChange={() => setAnalysisApprovalsCount(1)}
+                        className="w-4 h-4 text-blue-900 border-slate-300 focus:ring-blue-900"
+                      />
+                      <span className="text-sm text-slate-700">1 aprovação</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="approvalCount"
+                        checked={analysisApprovalsCount === 2}
+                        onChange={() => setAnalysisApprovalsCount(2)}
+                        className="w-4 h-4 text-blue-900 border-slate-300 focus:ring-blue-900"
+                      />
+                      <span className="text-sm text-slate-700">2 aprovações (sequencial)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* First Approver */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                    <Users size={14} />
+                    1º Aprovador
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={analysisFirstApprover || ''}
+                      onChange={(e) => setAnalysisFirstApprover(e.target.value || null)}
+                      className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 cursor-pointer"
+                    >
+                      <option value="">Selecione um aprovador...</option>
+                      {availableApprovers.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.full_name} ({user.role})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Usuário responsável pela primeira aprovação
+                  </p>
+                </div>
+
+                {/* Second Approver (only if 2 approvals) */}
+                {analysisApprovalsCount === 2 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                      <Users size={14} />
+                      2º Aprovador
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={analysisSecondApprover || ''}
+                        onChange={(e) => setAnalysisSecondApprover(e.target.value || null)}
+                        className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 cursor-pointer"
+                      >
+                        <option value="">Selecione um aprovador...</option>
+                        {availableApprovers
+                          .filter(u => u.id !== analysisFirstApprover) // Don't show first approver
+                          .map((user) => (
+                            <option key={user.id} value={user.id}>
+                              {user.full_name} ({user.role})
+                            </option>
+                          ))}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Usuário responsável pela segunda aprovação (após a primeira)
+                    </p>
+                  </div>
+                )}
+
+                {/* Timer Toggle */}
+                <div className="pt-4 border-t border-slate-100">
+                  <Toggle
+                    label="Tempo limite para análise"
+                    description="Define um prazo máximo para que a análise seja concluída"
+                    active={analysisHasTimer}
+                    onChange={(val) => setAnalysisHasTimer(val)}
+                  />
+
+                  {analysisHasTimer && (
+                    <div className="mt-4 space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                        <Clock size={14} />
+                        Tempo em minutos
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={analysisTimerMinutes || ''}
+                        onChange={(e) => setAnalysisTimerMinutes(e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="Ex: 30"
+                        className="w-32 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900"
+                      />
+                      <p className="text-xs text-slate-400">
+                        Após este tempo, o checklist pode ser liberado automaticamente
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </Accordion >
+      </div >
     );
   }
 
