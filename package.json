@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "web": "vite --port 3000 --open",
     "mobile:install": "cd mobile-client && npm install",
-    "mobile": "cd mobile-client && npm run dev"
+    "mobile": "cd mobile-client && npm run dev",
+    "mobile:build": "cd mobile-client && npm run build:android",
+    "mobile:open": "cd mobile-client && npm run open:android"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

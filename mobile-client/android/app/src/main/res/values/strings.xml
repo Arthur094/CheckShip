@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CheckShip Mobile</string>
+    <string name="title_activity_main">CheckShip Mobile</string>
+    <string name="package_name">com.checkship.mobile</string>
+    <string name="custom_url_scheme">com.checkship.mobile</string>
+</resources>
