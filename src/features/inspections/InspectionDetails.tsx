@@ -228,12 +228,7 @@ const InspectionDetails: React.FC = () => {
 
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-3">
-                                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                    inspection.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                                        'bg-yellow-100 text-yellow-700'
-                                    }`}>
-                                    {inspection.status === 'completed' ? 'Concluído' : inspection.status === 'pending' ? 'Em Análise' : 'Em Andamento'}
-                                </span>
+                                {/* Status badge removed as per request */}
                                 <span className="text-slate-300">|</span>
                                 <span className="text-sm font-bold text-slate-600">ID: {inspection.code || inspection.id.substr(0, 8)}</span>
                             </div>
@@ -526,15 +521,7 @@ const InspectionDetails: React.FC = () => {
                 </div>
             )}
 
-            {/* DEBUG INFO */}
-            <div className="max-w-7xl mx-auto px-8 pb-10">
-                <details className="bg-slate-100 p-4 rounded-lg cursor-pointer">
-                    <summary className="text-xs font-bold text-slate-500 uppercase">Debug Info (Dados Brutos)</summary>
-                    <pre className="mt-4 text-xs font-mono bg-slate-800 text-green-400 p-4 rounded overflow-auto max-h-96">
-                        {JSON.stringify(inspection?.responses, null, 2)}
-                    </pre>
-                </details>
-            </div>
+            {/* DEBUG INFO REMOVED */}
         </div>
     );
 };

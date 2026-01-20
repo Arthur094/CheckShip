@@ -14,6 +14,7 @@ interface UserConfigProps {
 const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
+    const [accessProfiles, setAccessProfiles] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
         id: initialData?.id || null,
@@ -22,8 +23,32 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
         role: initialData?.role || '',
         document: initialData?.document || '',
         phone: initialData?.phone || '',
-        active: initialData?.active !== undefined ? initialData.active : true
+        active: initialData?.active !== undefined ? initialData.active : true,
+        // New fields
+        password: '',
+        confirmPassword: '',
+        showPassword: false,
+        showConfirmPassword: false,
+        force_password_change: initialData?.force_password_change || false,
+        access_profile_id: initialData?.access_profile_id || '',
+        accessProfiles: [] as any[] // Pass down to form
     });
+
+    // Fetch Access Profiles
+    useEffect(() => {
+        const fetchProfiles = async () => {
+            const { data, error } = await supabase
+                .from('access_profiles')
+                .select('*')
+                .order('name');
+
+            if (!error && data) {
+                setAccessProfiles(data);
+                setFormData(prev => ({ ...prev, accessProfiles: data }));
+            }
+        };
+        fetchProfiles();
+    }, []);
 
     // Ensure we have a stable ID for assignments even if isNew
     const [stableId] = useState(formData.id || crypto.randomUUID());
@@ -39,7 +64,14 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                 role: initialData.role || '',
                 document: initialData.document || '',
                 phone: initialData.phone || '',
-                active: initialData.active !== undefined ? initialData.active : true
+                active: initialData.active !== undefined ? initialData.active : true,
+                password: '',
+                confirmPassword: '',
+                showPassword: false,
+                showConfirmPassword: false,
+                force_password_change: initialData.force_password_change || false,
+                access_profile_id: initialData.access_profile_id || '',
+                accessProfiles: accessProfiles
             });
         }
     }, [initialData]);
@@ -49,38 +81,89 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
     };
 
     const performSave = async (silent = false) => {
-        if (!formData.full_name.trim() || !formData.email.trim() || !formData.role) {
-            if (!silent) alert('Nome, E-mail e Cargo são obrigatórios.');
+        // Validation
+        if (!formData.full_name.trim() || !formData.email.trim() || (!formData.role && !formData.access_profile_id)) {
+            if (!silent) alert('Nome, E-mail e Perfil de Acesso são obrigatórios.');
             return false;
+        }
+
+        if (isNew) {
+            if (!formData.password) {
+                if (!silent) alert('Senha é obrigatória para novos usuários.');
+                return false;
+            }
+            if (formData.password !== formData.confirmPassword) {
+                if (!silent) alert('As senhas não coincidem.');
+                return false;
+            }
+        } else {
+            if (formData.password && formData.password !== formData.confirmPassword) {
+                if (!silent) alert('As senhas não coincidem.');
+                return false;
+            }
         }
 
         try {
             if (!silent) setLoading(true);
 
-            // Bypass: Inserção direta na tabela profiles
-            // O usuário deve criar a conta Auth manualmente no painel Supabase
-            const payload = {
-                id: stableId, // UUID gerado ou existente
-                full_name: formData.full_name,
-                email: formData.email,
-                role: formData.role,
-                document: formData.document,
-                phone: formData.phone,
-                active: formData.active,
-                updated_at: new Date().toISOString()
-            };
+            if (isNew) {
+                // CREATE USER via Edge Function
+                const { data, error } = await supabase.functions.invoke('admin-create-user', {
+                    body: {
+                        email: formData.email,
+                        password: formData.password,
+                        full_name: formData.full_name,
+                        role: formData.role, // Legacy compatibility
+                        access_profile_id: formData.access_profile_id,
+                        document: formData.document,
+                        phone: formData.phone,
+                        force_password_change: formData.force_password_change,
+                        active: formData.active
+                    }
+                });
 
-            const { error } = await supabase
-                .from('profiles')
-                .upsert(payload);
+                if (error) throw error;
+                if (!silent) alert('Usuário criado com sucesso!');
+                return true;
 
-            if (error) throw error;
+            } else {
+                // UPDATE EXISTING USER
 
-            if (!silent) alert('Usuário salvo (Perfil criado/atualizado). Lembre-se de criar o Auth manualmente.');
-            return true;
+                // 1. Update Profile Data (Direct DB update for non-auth fields)
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({
+                        full_name: formData.full_name,
+                        role: formData.role,
+                        access_profile_id: formData.access_profile_id,
+                        document: formData.document,
+                        phone: formData.phone,
+                        force_password_change: formData.force_password_change,
+                        // active is updated via list usually, but can be here too? keeping it safe
+                        active: formData.active,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', formData.id);
+
+                if (profileError) throw profileError;
+
+                // 2. Update Password/Email via Edge Function (if changed)
+                if (formData.password) {
+                    const { error: authError } = await supabase.functions.invoke('admin-update-user', {
+                        body: {
+                            user_id: formData.id,
+                            password: formData.password
+                        }
+                    });
+                    if (authError) throw authError;
+                }
+
+                if (!silent) alert('Usuário atualizado com sucesso!');
+                return true;
+            }
         } catch (error: any) {
-            console.error('Error saving user:', error.message);
-            if (!silent) alert('Erro ao salvar: ' + error.message);
+            console.error('Error saving user:', error);
+            if (!silent) alert('Erro ao salvar: ' + (error.message || 'Erro desconhecido'));
             return false;
         } finally {
             if (!silent) setLoading(false);

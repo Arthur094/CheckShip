@@ -65,3 +65,19 @@ Se você não tem um Android físico, pode criar um virtual:
 
 - **"npm error Missing script"**: Certifique-se de estar rodando os comandos na pasta raiz `c:\Projetinhos\CheckShip`.
 - **Botão Build desabilitado**: É sinal de que o Gradle Sync ainda não terminou. Aguarde a barra de progresso inferior sumir.
+
+---
+
+## 🔄 Resumo do Fluxo de Trabalho
+
+| Comando | Para que serve? | Quando usar? |
+| :--- | :--- | :--- |
+| `npm run mobile` | Roda o site no navegador. | **No dia a dia**. Use para programar e testar lógica/visual rapidamente no PC. |
+| `npm run mobile:build` | Prepara os arquivos para o Android. | **Quando quiser testar no celular/emulador**. Rode isso após finalizar suas alterações. |
+| `npm run mobile:open` | Abre o Android Studio. | Apenas se o programa estiver fechado. |
+
+**Exemplo de Rotina:**
+1. Programe usando `npm run mobile` e testando no Chrome.
+2. Terminou uma funcionalidade? Pare o terminal (`Ctrl+C`).
+3. Rode `npm run mobile:build`.
+4. Vá no Android Studio e clique no **Play** (▶) ou **Build APK** para ver no emulador/celular.

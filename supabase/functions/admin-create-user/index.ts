@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     const body = await req.json()
     console.log('Dados recebidos (admin-create-user):', body)
 
-    const { email, password, full_name, role, document, phone } = body
+    const { email, password, full_name, role, document, phone, access_profile_id, force_password_change, active } = body
 
     if (!email || !password) {
       return new Response(
@@ -91,11 +91,34 @@ Deno.serve(async (req) => {
       user_metadata: {
         full_name,
         role,
-        document, // Passando para metadata, embora não exigido no trigger, é bom ter
+        document,
       }
     })
 
     if (createError) throw createError
+
+    // 5. Garantir criação do perfil com todos os dados
+    if (newUser.user) {
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: newUser.user.id,
+          email,
+          full_name,
+          role,
+          document,
+          phone,
+          access_profile_id: access_profile_id || null,
+          force_password_change: force_password_change || false,
+          active: active !== undefined ? active : true,
+          updated_at: new Date().toISOString()
+        })
+
+      if (profileError) {
+        console.error('Erro ao criar profile:', profileError)
+        // Não abortamos, pois o user já foi criado, mas logamos
+      }
+    }
 
     return new Response(
       JSON.stringify(newUser),

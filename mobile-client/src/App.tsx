@@ -113,7 +113,13 @@ export default function App() {
   }, []);
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+    setSession(null);
+    localStorage.removeItem('sb-thztbankqpgtgiknzkaw-auth-token'); // Clear Supabase token manually just in case
   };
 
   return (

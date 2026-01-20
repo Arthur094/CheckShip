@@ -363,7 +363,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
                         <div className="col-span-2">Placa</div>
-                        <div className="col-span-8">Veículo</div>
+                        <div className="col-span-8">Tipo de Veículo</div>
                         <div className="col-span-2 text-right group flex items-center justify-end gap-2 cursor-pointer" onClick={handleBulkToggle}>
                             <span className="group-hover:hidden">Vincular</span>
                             <span className="hidden group-hover:block text-blue-600 font-extrabold text-[10px] tracking-wide bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shadow-sm transition-all">MARCAR TODOS</span>
@@ -383,8 +383,8 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                                         <div className="col-span-2 text-sm text-slate-500 font-mono">
                                             {vehicle.plate}
                                         </div>
-                                        <div className="col-span-8 text-sm text-slate-700 font-medium">
-                                            {vehicle.model}
+                                        <div className="col-span-8 text-sm text-slate-700 font-medium h-full flex items-center">
+                                            {vehicle.vehicle_types?.name || <span className="text-slate-400 italic">Sem tipo definido</span>}
                                         </div>
                                         <div className="col-span-2 flex justify-end">
                                             <label className="relative inline-flex items-center cursor-pointer">
