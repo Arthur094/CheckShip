@@ -94,9 +94,9 @@ const UserForm: React.FC<UserFormProps> = ({ data, onChange }) => {
                         <label className="block text-sm font-medium text-slate-700 mb-1">Perfil de Acesso *</label>
                         <select
                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-900 focus:border-blue-900 outline-none transition-all text-slate-700"
-                            value={data.role || ''} // Fallback to role for compatibility, but ideally use access_profile_id
+                            value={data.access_profile_id || data.role || ''}
                             onChange={(e) => {
-                                // Find selected profile to set role name for compatibility
+                                // Find selected profile
                                 const selectedProfile = data.accessProfiles?.find((p: any) => p.id === e.target.value);
                                 onChange('access_profile_id', e.target.value);
                                 if (selectedProfile) onChange('role', selectedProfile.name);

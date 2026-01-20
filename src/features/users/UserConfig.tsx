@@ -107,6 +107,13 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
             if (!silent) setLoading(true);
 
             if (isNew) {
+                // Get fresh session
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (!session?.access_token) {
+                    throw new Error('Sessão expirada. Faça login novamente.');
+                }
+
                 // CREATE USER via Edge Function
                 const { data, error } = await supabase.functions.invoke('admin-create-user', {
                     body: {
@@ -119,6 +126,9 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                         phone: formData.phone,
                         force_password_change: formData.force_password_change,
                         active: formData.active
+                    },
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`
                     }
                 });
 
@@ -149,10 +159,16 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
 
                 // 2. Update Password/Email via Edge Function (if changed)
                 if (formData.password) {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session?.access_token) throw new Error('Sessão inválida');
+
                     const { error: authError } = await supabase.functions.invoke('admin-update-user', {
                         body: {
                             user_id: formData.id,
                             password: formData.password
+                        },
+                        headers: {
+                            Authorization: `Bearer ${session.access_token}`
                         }
                     });
                     if (authError) throw authError;
@@ -162,8 +178,18 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                 return true;
             }
         } catch (error: any) {
-            console.error('Error saving user:', error);
-            if (!silent) alert('Erro ao salvar: ' + (error.message || 'Erro desconhecido'));
+            console.error('Error saving user FULL:', error);
+            console.log('Error details:', JSON.stringify(error, null, 2));
+            if (error && error.context) {
+                error.context.json().then((json: any) => {
+                    console.log('Error Body JSON:', json);
+                    alert('Erro Backend: ' + (json.error || json.message || 'Sem detalhes'));
+                }).catch(() => {
+                    alert('Erro ao salvar: ' + (error.message || 'Erro desconhecido'));
+                });
+            } else {
+                alert('Erro ao salvar: ' + (error.message || 'Erro desconhecido'));
+            }
             return false;
         } finally {
             if (!silent) setLoading(false);

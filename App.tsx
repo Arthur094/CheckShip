@@ -144,8 +144,41 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
 };
 
 import { useAuth, AuthProvider } from './src/hooks/useAuth';
+import ChangePasswordScreen from './src/features/auth/ChangePasswordScreen';
+import { supabase } from './src/lib/supabase';
 
-// ... existing code ...
+const ForcePasswordChangeGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [checking, setChecking] = useState(true);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  useEffect(() => {
+    const checkProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // We can cache this or invoke a lightweight query
+        const { data } = await supabase
+          .from('profiles')
+          .select('force_password_change')
+          .eq('id', user.id)
+          .single();
+
+        if (data?.force_password_change) {
+          setShouldRedirect(true);
+        }
+      }
+      setChecking(false);
+    };
+    checkProfile();
+  }, []);
+
+  if (checking) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin w-8 h-8 border-4 border-blue-900 border-t-transparent rounded-full"></div></div>;
+
+  if (shouldRedirect) {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 const App: React.FC = () => {
   return (
@@ -153,9 +186,26 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<MainLayout />} />
-          <Route path="/ckrealizados" element={<MainLayout initialTab="history" />} />
-          <Route path="/inspections/:id" element={<InspectionDetails />} />
+          <Route path="/change-password" element={<ChangePasswordScreen />} />
+
+          <Route path="/dashboard" element={
+            <ForcePasswordChangeGuard>
+              <MainLayout />
+            </ForcePasswordChangeGuard>
+          } />
+
+          <Route path="/ckrealizados" element={
+            <ForcePasswordChangeGuard>
+              <MainLayout initialTab="history" />
+            </ForcePasswordChangeGuard>
+          } />
+
+          <Route path="/inspections/:id" element={
+            <ForcePasswordChangeGuard>
+              <InspectionDetails />
+            </ForcePasswordChangeGuard>
+          } />
+
           <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
