@@ -46,8 +46,25 @@ DROP POLICY IF EXISTS "Usuarios atualizam proprio perfil" ON public.profiles;
 DROP POLICY IF EXISTS "Gestores tem controle total" ON public.profiles;
 DROP POLICY IF EXISTS "Usuario atualiza proprio perfil" ON public.profiles;
 
--- PARTE 3: Criar função auxiliar que lê do JWT (sem consultar tabela)
+-- PARTE 3: Criar/atualizar funções auxiliares que lêem do JWT (sem consultar tabela)
+
+-- Esta função é usada APENAS pelas policies de profiles
 CREATE OR REPLACE FUNCTION public.get_my_company_id()
+RETURNS UUID AS $$
+BEGIN
+  -- Lê company_id diretamente do user_metadata no JWT
+  RETURN (
+    SELECT (auth.jwt()->'user_metadata'->>'company_id')::uuid
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- IMPORTANTE: Atualizar a função get_user_company_id que é usada por TODAS as outras tabelas
+-- para também ler do JWT ao invés de consultar profiles
+CREATE OR REPLACE FUNCTION public.get_user_company_id()
 RETURNS UUID AS $$
 BEGIN
   -- Lê company_id diretamente do user_metadata no JWT

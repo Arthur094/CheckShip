@@ -11,17 +11,37 @@ Deno.serve(async (req) => {
     }
 
     try {
+        const authHeader = req.headers.get('Authorization')
+        if (!authHeader) {
+            return new Response(
+                JSON.stringify({ error: 'Missing Authorization header' }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+            { global: { headers: { Authorization: authHeader } } }
         )
 
-        // 1. Verificar se quem chama é GESTOR (Admin)
-        const { data: { user } } = await supabaseClient.auth.getUser()
-        if (!user) throw new Error('Não autenticado')
+        // 1. Verificar quem está chamando
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+        if (userError || !user) {
+            return new Response(
+                JSON.stringify({ error: 'Não autenticado' }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
 
-        const { data: requesterProfile, error: profileError } = await supabaseClient
+        // 2. Cliente Admin para operações privilegiadas (criado antes para verificar role)
+        const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
+
+        // 3. Verificar se quem chama é GESTOR (usando admin para evitar RLS)
+        const { data: requesterProfile, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('role')
             .eq('id', user.id)
@@ -36,18 +56,15 @@ Deno.serve(async (req) => {
 
         const { user_id } = await req.json()
 
-        if (!user_id) throw new Error('user_id é obrigatório')
+        if (!user_id) {
+            return new Response(
+                JSON.stringify({ error: 'user_id é obrigatório' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
 
-        // 2. Cliente Admin para operações privilegiadas
-        const supabaseAdmin = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-
-        // 3. Excluir Usuário no Auth (Cascade deletará o perfil devido à FK)
-        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
-            user_id
-        )
+        // 4. Excluir Usuário no Auth (Cascade deletará o perfil devido à FK)
+        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id)
 
         if (deleteError) throw deleteError
 
