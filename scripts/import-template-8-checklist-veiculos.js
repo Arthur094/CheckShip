@@ -2,9 +2,8 @@
 // Devido ao tamanho, o código está otimizado para facilitar manutenção
 
 import https from 'https';
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from './config.js';
 
-const SUPABASE_URL = 'https://thztbankqpgtgiknzkaw.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoenRiYW5rcXBndGdpa256a2F3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzkxNzY5OSwiZXhwIjoyMDgzNDkzNjk5fQ.XfJy9FlkUm1FV5EKs73Lfc8peOlLB5go3h0-SFYbdRs';
 
 const settings = {
     app_only: false, bulk_answer: true, share_email: true, allow_gallery: true,
