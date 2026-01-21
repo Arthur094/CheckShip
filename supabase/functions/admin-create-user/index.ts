@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
         full_name,
         role,
         document,
+        company_id: company_id || null,  // Incluído no JWT para RLS
       }
     })
 
