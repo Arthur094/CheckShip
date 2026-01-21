@@ -73,6 +73,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                     const { data: insp, error: inspError } = await supabase
                         .from('checklist_inspections')
                         .insert({
+                            company_id: user?.user_metadata?.company_id, // Garante que o RLS permita a inserção
                             checklist_template_id: checklistId,
                             vehicle_id: vehicleId,
                             inspector_id: user?.id,
