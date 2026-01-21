@@ -2,14 +2,15 @@
 
 ## 🔴 Críticos (Requerem Atenção Imediata)
 
-### 1. RLS da Tabela `profiles` Desativado
-**Situação:** O Row Level Security da tabela `profiles` foi desativado em produção para contornar erro de recursão infinita.
+### 1. ~~RLS da Tabela `profiles` Desativado~~ ✅ RESOLVIDO
+**Situação:** ~~O Row Level Security da tabela `profiles` estava desativado em produção.~~ **Corrigido!**
 
-**Risco:** Qualquer usuário autenticado pode, em teoria, ver todos os perfis do sistema (não apenas da sua empresa).
-
-**Solução Proposta:**
-- Refatorar a policy usando `auth.jwt()` para obter o `company_id` diretamente do token JWT (sem consultar a tabela `profiles`)
-- Ou armazenar o `company_id` no `user_metadata` durante o cadastro e ler via `auth.jwt()->>'user_metadata'->>'company_id'`
+**Solução Aplicada:**
+- Armazenado `company_id` no `user_metadata` do JWT durante o cadastro
+- Atualizada função `get_user_company_id()` para ler do JWT
+- Criadas novas policies RLS que leem do JWT (sem recursão)
+- RLS reativado em produção
+- Script: `database/SCRIPT_FIX_PROFILES_RLS.sql`
 
 ---
 
