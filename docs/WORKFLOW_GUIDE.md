@@ -138,6 +138,50 @@ npx supabase functions deploy NOME_DA_FUNCAO --project-ref thztbankqpgtgiknzkaw 
 
 ---
 
+## 🛠️ Scripts de Automação
+
+Os scripts em `/scripts` são usados para importar dados em massa (usuários, veículos, templates).
+
+### Configuração Inicial (primeira vez)
+
+```powershell
+# Navegue até a pasta scripts
+cd scripts
+
+# Copie o arquivo de exemplo de credenciais
+copy .env.example .env
+
+# Edite o arquivo .env com suas credenciais reais
+# SUPABASE_URL=https://...
+# SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+### Executar Scripts
+
+```powershell
+# Navegue até a pasta scripts
+cd scripts
+
+# Execute o script desejado
+node import-users.js
+node import-vehicles.js
+node assign-vehicles.js
+```
+
+### Scripts Disponíveis
+
+| Script | Função |
+|--------|--------|
+| `import-users.js` | Importa usuários do CSV `data/usuarios.csv` |
+| `import-vehicles.js` | Importa veículos do CSV `data/veiculos.csv` |
+| `assign-vehicles.js` | Atribui veículos a motoristas via `data/atribuicoes-veiculos.csv` |
+| `import-template-*.js` | Importa templates de checklist específicos |
+| `sync-users.js` | Sincroniza lista de usuários (deleta e cria) |
+
+> ⚠️ **Atenção:** As credenciais ficam em `scripts/.env` que é ignorado pelo Git. Nunca commite esse arquivo!
+
+---
+
 ## 📱 Build do App Mobile
 
 ```powershell

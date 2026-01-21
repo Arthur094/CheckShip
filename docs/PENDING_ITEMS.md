@@ -13,15 +13,14 @@
 
 ---
 
-### 2. Service Role Key Exposta em Scripts
-**Situação:** Os scripts em `/scripts/*.js` contêm a `SUPABASE_SERVICE_ROLE_KEY` hardcoded.
+### 2. ~~Service Role Key Exposta em Scripts~~ ✅ RESOLVIDO
+**Situação:** ~~Os scripts em `/scripts/*.js` contêm a `SUPABASE_SERVICE_ROLE_KEY` hardcoded.~~ **Corrigido!**
 
-**Risco:** Se o repositório se tornar público ou vazar, a chave dá acesso total ao banco.
-
-**Solução Proposta:**
-- Criar arquivo `.env` na pasta `/scripts` com as credenciais
-- Modificar os scripts para ler de `process.env`
-- Adicionar `/scripts/.env` ao `.gitignore`
+**Solução Aplicada:**
+- Criado arquivo `scripts/.env` com as credenciais (ignorado pelo git)
+- Criado arquivo `scripts/.env.example` como template
+- Criado módulo `scripts/config.js` centralizado que lê do `.env`
+- Todos os 17 scripts atualizados para usar o módulo
 
 ---
 
