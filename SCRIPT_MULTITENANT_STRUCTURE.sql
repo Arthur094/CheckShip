@@ -101,9 +101,7 @@ ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES public.companies(id);
 ALTER TABLE public.profile_checklist_permissions 
 ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES public.companies(id);
 
--- vehicle_type_checklists
-ALTER TABLE public.vehicle_type_checklists 
-ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES public.companies(id);
+-- (Tabela vehicle_type_checklists ignorada)
 
 -- =====================================================
 -- 4. CRIAR ÍNDICES PARA company_id
@@ -162,9 +160,7 @@ UPDATE public.profile_checklist_permissions
 SET company_id = (SELECT id FROM public.companies WHERE slug = 'transportadorarolim')
 WHERE company_id IS NULL;
 
-UPDATE public.vehicle_type_checklists 
-SET company_id = (SELECT id FROM public.companies WHERE slug = 'transportadorarolim')
-WHERE company_id IS NULL;
+-- (Tabela vehicle_type_checklists removida pois não existe em produção)
 
 -- =====================================================
 -- 6. ATUALIZAR TRIGGER handle_new_user PARA INCLUIR company_id
