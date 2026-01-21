@@ -10,7 +10,7 @@ const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 const users = [];
 
 // Ler CSV
-fs.createReadStream('usuarios.csv')
+fs.createReadStream('../data/usuarios.csv')
     .pipe(csv())
     .on('data', (row) => {
         users.push(row);

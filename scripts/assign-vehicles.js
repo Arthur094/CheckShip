@@ -12,7 +12,7 @@ const assignments = [];
 console.log('Lendo arquivo CSV...\n');
 
 // Ler CSV
-fs.createReadStream('atribuicoes-veiculos.csv')
+fs.createReadStream('../data/atribuicoes-veiculos.csv')
     .pipe(csv())
     .on('data', (row) => {
         assignments.push(row);
