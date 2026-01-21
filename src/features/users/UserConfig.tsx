@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import UserForm from './UserForm';
 import UserVehicles from './UserVehicles';
 import UserChecklists from './UserChecklists';
-import { supabase } from '../../lib/supabase';
+import { supabase, getCompanyId } from '../../lib/supabase';
 
 interface UserConfigProps {
     onBack: () => void;
@@ -115,6 +115,9 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                 }
 
                 // CREATE USER via Edge Function
+                // Buscar company_id do subdomínio atual
+                const companyId = await getCompanyId();
+
                 const { data, error } = await supabase.functions.invoke('admin-create-user', {
                     body: {
                         email: formData.email,
@@ -125,7 +128,8 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                         document: formData.document,
                         phone: formData.phone,
                         force_password_change: formData.force_password_change,
-                        active: formData.active
+                        active: formData.active,
+                        company_id: companyId
                     },
                     headers: {
                         Authorization: `Bearer ${session.access_token}`

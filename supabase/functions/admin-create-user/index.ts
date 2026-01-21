@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     const body = await req.json()
     console.log('Dados recebidos (admin-create-user):', body)
 
-    const { email, password, full_name, role, document, phone, access_profile_id, force_password_change, active } = body
+    const { email, password, full_name, role, document, phone, access_profile_id, force_password_change, active, company_id } = body
 
     if (!email || !password) {
       return new Response(
@@ -111,6 +111,7 @@ Deno.serve(async (req) => {
           access_profile_id: access_profile_id || null,
           force_password_change: force_password_change || false,
           active: active !== undefined ? active : true,
+          company_id: company_id || null,
           updated_at: new Date().toISOString()
         })
 
