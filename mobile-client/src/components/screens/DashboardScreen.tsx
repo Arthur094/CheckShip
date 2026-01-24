@@ -7,6 +7,22 @@ import { localStorageService } from '../../services/localStorageService';
 import { cacheService } from '../../services/cacheService';
 import { supabase } from '../../lib/supabase';
 
+const DuckIcon: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = "" }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    <path d="M19.5,4.5h-0.8c0.3-0.5,0.4-1,0.2-1.6c-0.2-0.6-0.8-1-1.4-1.2c-0.6-0.1-1.2,0.1-1.7,0.5L14,3.8C13.2,3.3,12.1,3,11,3
+    c-3.3,0-6,2.7-6,6c0,2.1,1.1,3.9,2.8,5c-0.3,0.3-0.7,0.7-1,1.1l-2.4-0.8c-0.6-0.2-1.2,0.1-1.5,0.7s0,1.3,0.6,1.7l3,1.6
+    c1.4,0.7,3,0.8,4.5,0.2c1.5-0.6,2.6-1.8,3.1-3.3c3.8-0.9,6.5-4.4,6.5-8.4C20.5,5.9,20.1,5.1,19.5,4.5z M16.5,8c-0.6,0-1-0.4-1-1
+    s0.4-1,1-1s1,0.4,1,1S17.1,8,16.5,8z"/>
+  </svg>
+);
+
 const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -114,7 +130,7 @@ const DashboardScreen: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <div className="size-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-blue-600">edit_note</span>
+                    <DuckIcon size={24} className="text-blue-600" />
                   </div>
                   <div>
                     <h3 className="font-bold uppercase text-slate-900">{draft.vehiclePlate}</h3>
@@ -134,7 +150,7 @@ const DashboardScreen: React.FC = () => {
               <article key={inspection.id} className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="size-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
-                    <span className="material-symbols-outlined">local_shipping</span>
+                    <DuckIcon size={24} className="text-slate-500" />
                   </div>
                   <div>
                     <h3 className="font-bold uppercase">{inspection.vehicles?.plate}</h3>

@@ -1,0 +1,2 @@
+id,name,is_admin,can_apply_checklists,can_approve_checklists,can_view_others_incomplete,can_reopen_completed,can_delete_checklists,can_comment_evaluations,can_view_history,created_at,updated_at,company_id
+dc57124a-0c41-474b-885d-a48e8e051be6,Gestor,false,true,true,false,false,false,false,false,2026-01-19 00:45:47.604155+00,2026-01-19 00:45:47.604155+00,e568c1dd-5848-4b99-b351-77d5d2606d74

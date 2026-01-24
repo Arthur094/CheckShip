@@ -5,8 +5,8 @@
 | Ambiente | Branch | URL Frontend | Projeto Supabase |
 |----------|--------|--------------|------------------|
 | **Desenvolvimento** | `develop` | `localhost:3000` | Staging (`pfaoasasnepcrdahmudu`) |
-| **Staging** | `develop` | `staging.checkship.com.br` | Staging (`pfaoasasnepcrdahmudu`) |
-| **Produção** | `main` | `transportadorarolim.checkship.com.br` | Produção (`thztbankqpgtgiknzkaw`) |
+| **Staging** | `develop` | `appstaging.checkship.com.br` | Staging (`pfaoasasnepcrdahmudu`) |
+| **Produção** | `main` | `app.checkship.com.br` | Produção (`thztbankqpgtgiknzkaw`) |
 
 ---
 
