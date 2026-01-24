@@ -115,8 +115,8 @@ const DashboardScreen: React.FC = () => {
 
 
         {drafts.length === 0 && inspections.length === 0 ? (
-          <div className="text-center py-20 opacity-60">
-            <span className="material-symbols-outlined text-5xl mb-2 text-slate-300">inventory_2</span>
+          <div className="text-center py-20 opacity-60 flex flex-col items-center">
+            <DuckIcon size={48} className="text-slate-300 mb-2" />
             <p className="text-slate-400">Nenhum checklist em aberto.</p>
           </div>
         ) : (
