@@ -5,6 +5,7 @@ import FleetForm from './FleetForm';
 import FleetUsers from './FleetUsers';
 import FleetChecklists from './FleetChecklists';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 interface FleetConfigProps {
     onBack: () => void;
@@ -12,6 +13,8 @@ interface FleetConfigProps {
 }
 
 const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
+    const { user } = useAuth();
+    const [companyId, setCompanyId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
 
@@ -52,6 +55,19 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
         }
     }, [initialData]);
 
+    useEffect(() => {
+        if (user) {
+            supabase
+                .from('profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single()
+                .then(({ data }) => {
+                    if (data) setCompanyId(data.company_id);
+                });
+        }
+    }, [user]);
+
     const handleFieldChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
@@ -82,7 +98,8 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                     ? parseInt(formData.year.toString())
                     : null,
                 color: formData.color,
-                active: formData.active
+                active: formData.active,
+                company_id: companyId
             };
 
             const { error } = await supabase

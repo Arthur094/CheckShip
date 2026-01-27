@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Save, CheckCircle, Camera, Upload, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ChecklistTemplate, ItemType } from '../../../types';
+import { calculateChecklistScore } from '../../utils/scoreCalculator';
+import SignaturePad from '../../components/common/SignaturePad';
 
 interface InspectionFormProps {
     checklistId: string;
@@ -24,6 +26,10 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     const [answers, setAnswers] = useState<Record<string, InspectionAnswer>>({});
     const [saving, setSaving] = useState(false);
     const [inspectionId, setInspectionId] = useState<string | null>(null);
+
+    // Signature states
+    const [showSignatureModal, setShowSignatureModal] = useState(false);
+    const [driverSignatureUrl, setDriverSignatureUrl] = useState<string | null>(null);
 
     useEffect(() => {
         const init = async () => {
@@ -103,6 +109,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     const handleAnswerChange = (itemId: string, value: any) => {
         setAnswers(prev => {
             const current = prev[itemId] || { item_id: itemId };
+            const timestamp = new Date().toISOString();
 
             // If value contains imageUrl, merge it
             if (typeof value === 'object' && value.imageUrl) {
@@ -110,7 +117,9 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                     ...prev,
                     [itemId]: {
                         ...current,
-                        imageUrl: value.imageUrl
+                        imageUrl: value.imageUrl,
+                        // Update timestamp only if not already set or force update if desired
+                        answered_at: current.answered_at || timestamp
                     }
                 };
             }
@@ -120,24 +129,122 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                 ...prev,
                 [itemId]: {
                     ...current,
-                    answer: value
+                    answer: value,
+                    answered_at: timestamp
                 }
             };
         });
     };
 
-    const handleSave = async (complete: boolean = false) => {
+    // Handle signature save - upload to Supabase Storage or save base64 as fallback
+    const handleSignatureSave = async (dataUrl: string) => {
+        if (!inspectionId) {
+            alert('Erro: Inspeção não encontrada.');
+            return;
+        }
+
+        setSaving(true);
+
+        try {
+            // Try to upload to Supabase Storage
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+
+            const fileName = `${inspectionId}_driver_signature.png`;
+            const { data, error } = await supabase.storage
+                .from('signatures')
+                .upload(fileName, blob, {
+                    contentType: 'image/png',
+                    upsert: true
+                });
+
+            if (error) {
+                // Fallback: save base64 directly if storage upload fails
+                console.warn('Storage upload failed, saving base64 directly:', error.message);
+                setDriverSignatureUrl(dataUrl);
+                setShowSignatureModal(false);
+                await handleSave(true, dataUrl);
+                return;
+            }
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('signatures')
+                .getPublicUrl(fileName);
+
+            setDriverSignatureUrl(publicUrl);
+            setShowSignatureModal(false);
+            await handleSave(true, publicUrl);
+        } catch (error: any) {
+            console.error('Error saving signature:', error);
+            // Fallback: save base64 directly
+            console.warn('Fallback: saving base64 directly');
+            setDriverSignatureUrl(dataUrl);
+            setShowSignatureModal(false);
+            await handleSave(true, dataUrl);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Handle complete button click - check if signature required
+    const handleCompleteClick = () => {
+        // @ts-ignore - require_driver_signature may not be in type yet
+        const requiresSignature = template?.settings?.require_driver_signature;
+
+        if (requiresSignature && !driverSignatureUrl) {
+            setShowSignatureModal(true);
+        } else {
+            handleSave(true);
+        }
+    };
+
+    const handleSave = async (complete: boolean = false, signatureUrl?: string) => {
         if (!inspectionId) return;
         setSaving(true);
 
         try {
             console.log('💾 Salvando inspeção...', { inspectionId, complete, answers });
 
+            let scoreData = {};
+            if (complete && template) {
+                // @ts-ignore - scoreCalculator espera tipos estritos, mas aqui estamos no runtime
+                const result = calculateChecklistScore(template, answers);
+                console.log('📊 Pontuação Calculada:', result);
+                scoreData = {
+                    score: result.score,
+                    max_possible_score: result.maxPoints
+                };
+            }
+
+            // Determine status based on analysis workflow
+            let initialStatus = 'in_progress';
+            let analysisData = {};
+
+            if (complete) {
+                if (template.requires_analysis) {
+                    initialStatus = 'in_analysis';
+                    analysisData = {
+                        analysis_status: 'pending',
+                        analysis_current_step: 0,
+                        analysis_total_steps: template.analysis_approvals_count || 1
+                    };
+                } else {
+                    initialStatus = 'completed';
+                    analysisData = {
+                        analysis_status: 'approved' // Auto-approve if no analysis required
+                    };
+                }
+            }
+
             const payload = {
                 responses: answers,
                 updated_at: new Date().toISOString(),
-                status: complete ? 'completed' : 'in_progress',
-                completed_at: complete ? new Date().toISOString() : null
+                status: initialStatus,
+                completed_at: complete ? new Date().toISOString() : null,
+                ...(signatureUrl && { driver_signature_url: signatureUrl }),
+                ...scoreData,
+                ...analysisData
             };
 
             console.log('📦 Payload de envio:', payload);
@@ -197,7 +304,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                         {saving ? 'Salvando...' : 'Salvar'}
                     </button>
                     <button
-                        onClick={() => handleSave(true)}
+                        onClick={handleCompleteClick}
                         className="px-6 py-2 bg-blue-900 text-white font-bold text-sm rounded-lg hover:bg-blue-800 shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center gap-2"
                         disabled={saving}
                     >
@@ -259,6 +366,21 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                     </div>
                 ))}
             </div>
+
+            {/* Signature Modal Overlay */}
+            {showSignatureModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
+                        <SignaturePad
+                            title="Assinatura do Motorista"
+                            subtitle="Assine abaixo para finalizar a inspeção"
+                            required={true}
+                            onSave={handleSignatureSave}
+                            onCancel={() => setShowSignatureModal(false)}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -421,7 +543,40 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
     };
 
     // Correctly access mandatory_attachment from root item properties
-    const isMandatoryAttachment = item.mandatory_attachment || false;
+    // 1. isMandatoryAttachment - true only when the condition is currently met
+    const isMandatoryAttachment = React.useMemo(() => {
+        // 1. Global mandatory flag (legacy)
+        if (item.mandatory_attachment) return true;
+
+        // 2. Conditional rules (new)
+        const requirePhotoOn = item.config?.require_photo_on;
+        if (requirePhotoOn && Array.isArray(requirePhotoOn) && requirePhotoOn.length > 0) {
+            // N/S mode: Sim/Não
+            if (value === 'conforme' && (requirePhotoOn.includes('sim') || requirePhotoOn.includes('bom'))) return true;
+            if (value === 'nao_conforme' && (requirePhotoOn.includes('nao') || requirePhotoOn.includes('ruim'))) return true;
+
+            // Emoji mode: Bom/Regular/Ruim
+            if (value === 'bom' && requirePhotoOn.includes('bom')) return true;
+            if (value === 'regular' && requirePhotoOn.includes('regular')) return true;
+            if (value === 'ruim' && requirePhotoOn.includes('ruim')) return true;
+
+            // Direct match fallback
+            return requirePhotoOn.includes(value);
+        }
+
+        return false;
+    }, [item, value]);
+
+    // 2. shouldShowAttachmentField - show ONLY if:
+    //    - allow_photo is true (Anexos Opcionais marcado), OR
+    //    - isMandatoryAttachment is true (condição atendida)
+    const shouldShowAttachmentField = React.useMemo(() => {
+        // Show if "Anexos Opcionais" is checked
+        if (item.config?.allow_photo) return true;
+        // Show if mandatory condition is met
+        if (isMandatoryAttachment) return true;
+        return false;
+    }, [item, isMandatoryAttachment]);
 
     // Scale Type handling: faces_3 is the ID for Smile/Meh/Frown in Config
     const isSmileScale = item.config?.scale_type === 'faces_3' || item.config?.scale_type === 'faces_2';
@@ -445,56 +600,155 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
 
                 <div className="mt-2">
                     {/* --- AVALIATIVO (Scales) --- */}
+
                     {item.type === 'Avaliativo' && (
                         <div className="flex gap-3">
-                            {isSmileScale ? (
-                                // Scale: Icons (Smile/Meh/Frown)
+                            {/* LOGIC: Thumbs (Joinha) */}
+                            {item.config?.input_style === 'thumbs' ? (
                                 <>
                                     <button
                                         onClick={() => onChange('conforme')}
-                                        className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'conforme' ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        className={`flex-1 py-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-2 ${value === 'conforme' ? 'border-green-600 bg-green-50 text-green-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-lg shadow-sm">😊</div>
-                                        Bom
-                                    </button>
-                                    <button
-                                        onClick={() => onChange('regular')}
-                                        className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'regular' ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                                    >
-                                        <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-lg shadow-sm">😐</div>
-                                        Regular
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${value === 'conforme' ? 'bg-green-100 scale-110' : 'bg-slate-100'}`}>👍</div>
+                                        Aprovado
                                     </button>
                                     <button
                                         onClick={() => onChange('nao_conforme')}
-                                        className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'nao_conforme' ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        className={`flex-1 py-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-2 ${value === 'nao_conforme' ? 'border-red-600 bg-red-50 text-red-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-lg shadow-sm">😟</div>
-                                        Ruim
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${value === 'nao_conforme' ? 'bg-red-100 scale-110' : 'bg-slate-100'}`}>👎</div>
+                                        Reprovado
                                     </button>
                                 </>
-                            ) : (
-                                // Scale: S/N/NA
-                                <>
-                                    <button
-                                        onClick={() => onChange('conforme')}
-                                        className={`flex-1 h-12 rounded-lg border-2 font-black text-lg transition-all flex items-center justify-center shadow-sm ${value === 'conforme' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
-                                    >
-                                        S
-                                    </button>
-                                    <button
-                                        onClick={() => onChange('nao_conforme')}
-                                        className={`flex-1 h-12 rounded-lg border-2 font-black text-lg transition-all flex items-center justify-center shadow-sm ${value === 'nao_conforme' ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
-                                    >
-                                        N
-                                    </button>
-                                    <button
-                                        onClick={() => onChange('na')}
-                                        className={`flex-1 h-12 rounded-lg border-2 font-black text-sm transition-all flex items-center justify-center shadow-sm ${value === 'na' ? 'border-slate-400 bg-slate-400 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
-                                    >
-                                        N/A
-                                    </button>
-                                </>
-                            )}
+                            ) :
+                                /* LOGIC: Smile 3 (Faces) */
+                                (item.config?.input_style === 'smile_3' || isSmileScale) ? (
+                                    <>
+                                        <button
+                                            onClick={() => onChange('conforme')}
+                                            className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'conforme' ? 'border-green-500 bg-green-50 text-green-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-lg shadow-sm">😊</div>
+                                            Bom
+                                        </button>
+                                        <button
+                                            onClick={() => onChange('regular')}
+                                            className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'regular' ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-lg shadow-sm">😐</div>
+                                            Regular
+                                        </button>
+                                        <button
+                                            onClick={() => onChange('nao_conforme')}
+                                            className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'nao_conforme' ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-lg shadow-sm">😟</div>
+                                            Ruim
+                                        </button>
+                                    </>
+                                ) :
+                                    item.config?.input_style === 'happy_sad' ? (
+                                        <div className="flex w-full gap-4">
+                                            <button
+                                                onClick={() => onChange('conforme')}
+                                                className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${value === 'conforme' ? 'border-green-500 bg-green-50 text-green-600' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                            >
+                                                <div className="text-4xl">🙂</div>
+                                                <span className="text-sm font-bold">Feliz</span>
+                                            </button>
+                                            <button
+                                                onClick={() => onChange('nao_conforme')}
+                                                className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${value === 'nao_conforme' ? 'border-red-500 bg-red-50 text-red-600' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                            >
+                                                <div className="text-4xl">☹️</div>
+                                                <span className="text-sm font-bold">Triste</span>
+                                            </button>
+                                        </div>
+                                    ) :
+                                        item.config?.input_style === 'n_s' ? (
+                                            <div className="flex w-full gap-4">
+                                                <button
+                                                    onClick={() => onChange('nao_conforme')}
+                                                    className={`w-20 h-20 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${value === 'nao_conforme' ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-500/30' : 'border-slate-200 text-red-600 bg-white hover:border-red-200'}`}
+                                                >
+                                                    <span className="text-4xl font-black">N</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => onChange('conforme')}
+                                                    className={`w-20 h-20 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${value === 'conforme' ? 'border-green-600 bg-green-600 text-white shadow-lg shadow-green-500/30' : 'border-slate-200 text-green-600 bg-white hover:border-green-200'}`}
+                                                >
+                                                    <span className="text-4xl font-black">S</span>
+                                                </button>
+                                                <div className="flex-1 flex items-center justify-end">
+                                                    {/* Spacer or option for N/A if needed */}
+                                                    <button
+                                                        onClick={() => onChange('na')}
+                                                        className={`h-12 px-4 rounded-lg border flex items-center justify-center transition-all ${value === 'na' ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-transparent border-transparent text-slate-400 hover:text-slate-600'}`}
+                                                    >
+                                                        <span className="font-bold">N/A</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) :
+                                            item.config?.input_style === 'smile_5' ? (
+                                                /* Implementation of 5-scale mapped to 3 buckets for MVP */
+                                                <div className="flex w-full gap-1">
+                                                    {/* 1 - Ruim */}
+                                                    <button onClick={() => onChange('nao_conforme')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'nao_conforme' ? 'border-red-500 bg-red-50' : 'border-slate-100'}`}>
+                                                        <span className="text-xl">😠</span>
+                                                    </button>
+                                                    {/* 2 - Ruim/Regular */}
+                                                    <button onClick={() => onChange('nao_conforme_mild')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'nao_conforme_mild' ? 'border-orange-500 bg-orange-50' : 'border-slate-100'}`}>
+                                                        <span className="text-xl">☹️</span>
+                                                    </button>
+                                                    {/* 3 - Regular */}
+                                                    <button onClick={() => onChange('regular')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'regular' ? 'border-yellow-500 bg-yellow-50' : 'border-slate-100'}`}>
+                                                        <span className="text-xl">😐</span>
+                                                    </button>
+                                                    {/* 4 - Bom */}
+                                                    <button onClick={() => onChange('conforme_mild')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'conforme_mild' ? 'border-lime-500 bg-lime-50' : 'border-slate-100'}`}>
+                                                        <span className="text-xl">🙂</span>
+                                                    </button>
+                                                    {/* 5 - Excelente */}
+                                                    <button onClick={() => onChange('conforme')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'conforme' ? 'border-green-500 bg-green-50' : 'border-slate-100'}`}>
+                                                        <span className="text-xl">😄</span>
+                                                    </button>
+                                                </div>
+                                            ) :
+                                                (
+                                                    // Default Box Buttons (S/N or Bom/Regular/Ruim)
+                                                    <>
+                                                        <button
+                                                            onClick={() => onChange('conforme')}
+                                                            className={`flex-1 h-12 rounded-lg border-2 font-black text-lg transition-all flex items-center justify-center shadow-sm ${value === 'conforme' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
+                                                        >
+                                                            {item.config?.scale_type === 'brr' ? 'Bom' : 'Sim'}
+                                                        </button>
+
+                                                        {item.config?.scale_type === 'brr' && (
+                                                            <button
+                                                                onClick={() => onChange('regular')}
+                                                                className={`flex-1 h-12 rounded-lg border-2 font-black text-xs transition-all flex items-center justify-center shadow-sm ${value === 'regular' ? 'border-yellow-500 bg-yellow-500 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
+                                                            >
+                                                                Regular
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            onClick={() => onChange('nao_conforme')}
+                                                            className={`flex-1 h-12 rounded-lg border-2 font-black text-lg transition-all flex items-center justify-center shadow-sm ${value === 'nao_conforme' ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
+                                                        >
+                                                            {item.config?.scale_type === 'brr' ? 'Ruim' : 'Não'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onChange('na')}
+                                                            className={`flex-1 h-12 rounded-lg border-2 font-black text-sm transition-all flex items-center justify-center shadow-sm ${value === 'na' ? 'border-slate-400 bg-slate-400 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
+                                                        >
+                                                            N/A
+                                                        </button>
+                                                    </>
+                                                )}
                         </div>
                     )}
 
@@ -608,11 +862,13 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
                     )}
 
                     {/* --- MEDIA ATTACHMENTS (STRICT RULE) --- */}
-                    {/* ONLY SHOW if isMandatoryAttachment is TRUE. */}
-                    {console.log('🔴 Verificando mandatory attachment. isMandatoryAttachment:', isMandatoryAttachment, 'item:', item.name)}
-                    {isMandatoryAttachment && (
-                        <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100 animate-in fade-in">
-                            <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Evidência Obrigatória</p>
+                    {/* Show if there are any photo rules configured. Highlight when mandatory. */}
+                    {console.log('🔴 Verificando attachment. shouldShow:', shouldShowAttachmentField, 'isMandatory:', isMandatoryAttachment, 'item:', item.name, 'value:', value)}
+                    {shouldShowAttachmentField && (
+                        <div className={`mt-4 p-3 rounded-lg border animate-in fade-in ${isMandatoryAttachment ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                            <p className={`text-[10px] font-black uppercase mb-2 ${isMandatoryAttachment ? 'text-red-500' : 'text-slate-400'}`}>
+                                {isMandatoryAttachment ? 'Evidência Obrigatória' : 'Evidência (Opcional)'}
+                            </p>
 
                             {mediaPreview ? (
                                 <div className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-slate-200 group">

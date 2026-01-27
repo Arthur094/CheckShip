@@ -4,6 +4,8 @@ import { driverService } from '../../services/driverService';
 import { supabase } from '../../lib/supabase';
 import { localStorageService } from '../../services/localStorageService';
 import { cacheService } from '../../services/cacheService';
+import { ThumbsUp, ThumbsDown, Smile, Meh, Frown, Camera } from 'lucide-react';
+import SignaturePad from '../../../../src/components/common/SignaturePad';
 
 const InspectionScreen: React.FC = () => {
   const { vehicleId, templateId } = useParams();
@@ -12,6 +14,10 @@ const InspectionScreen: React.FC = () => {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Signature states
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [driverSignatureUrl, setDriverSignatureUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadTemplate() {
@@ -70,7 +76,66 @@ const InspectionScreen: React.FC = () => {
     }
   };
 
-  const handleFinish = async () => {
+  // Handle button click - check if signature required
+  const handleCompleteClick = () => {
+    const requiresSignature = template?.settings?.require_driver_signature;
+
+    if (requiresSignature && !driverSignatureUrl) {
+      setShowSignatureModal(true);
+    } else {
+      handleFinish(driverSignatureUrl);
+    }
+  };
+
+  // Handle signature save for Mobile
+  const handleSignatureSave = async (dataUrl: string) => {
+    setDriverSignatureUrl(dataUrl);
+    setShowSignatureModal(false);
+    await handleFinish(dataUrl);
+  };
+
+  const handleFinish = async (signatureUrl?: string | null) => {
+    // 🔍 VALIDAÇÃO DE FINALIZAÇÃO
+    // Verifica se há fotos obrigatórias pendentes
+    let pendingPhotos = false;
+    let pendingItemName = '';
+
+    template?.structure?.areas?.forEach((area: any) => {
+      area.items?.forEach((item: any) => {
+        if (!item) return;
+
+        const val = answers[item.id]?.answer;
+        const config = item.config || {};
+        const requirePhotoOn = config.require_photo_on || [];
+
+        // Lógica de obrigatoriedade
+        // 1. Se "always" está nas condições
+        // 2. Se "mandatoryAttachment" (legado) está true E não há condições específicas (fallback para sempre)
+        // 3. Se a resposta atual bate com uma condição ('nao', 'ruim', etc)
+        const conditionMet =
+          requirePhotoOn.includes('always') ||
+          (item.mandatoryAttachment && requirePhotoOn.length === 0) ||
+          (val === 'Não Conforme' && requirePhotoOn.includes('nao')) ||
+          (val === 'Não Conforme' && requirePhotoOn.includes('ruim')) ||
+          (val === 'Regular' && requirePhotoOn.includes('regular'));
+
+        if (conditionMet) {
+          // Checa se tem foto (URL online, base64 ou arquivo local pendente)
+          const hasPhoto = answers[item.id]?.imageUrl || answers[item.id + '_file'] || (answers[item.id]?.photos && answers[item.id]?.photos.length > 0);
+
+          if (!hasPhoto) {
+            pendingPhotos = true;
+            pendingItemName = item.name || 'Item sem nome';
+          }
+        }
+      });
+    });
+
+    if (pendingPhotos) {
+      alert(`⚠️ FOTO OBRIGATÓRIA!\n\nO item "${pendingItemName}" exige uma foto para a resposta selecionada.`);
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -118,7 +183,8 @@ const InspectionScreen: React.FC = () => {
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...(signatureUrl && { driver_signature_url: signatureUrl })
       };
 
       console.log('Salvando:', Object.keys(inspectionData.responses).length, 'respostas');
@@ -223,23 +289,196 @@ const InspectionScreen: React.FC = () => {
 
                   {/* Renderização baseada no TIPO */}
 
-                  {/* AVALIATIVO (Conforme/Não Conforme) */}
-                  {item.type === 'Avaliativo' && (
-                    <div className="flex gap-2">
-                      {['Conforme', 'Não Conforme', 'N/A'].map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => setAnswers({ ...answers, [item.id]: createAnswer(opt) })}
-                          className={`flex-1 py-3 rounded-lg border text-xs font-bold transition-all ${answers[item.id]?.answer === opt
-                            ? (opt === 'Não Conforme' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-900 text-white border-blue-900')
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* AVALIATIVO (Conforme/Não Conforme / Smiles / Thumbs) */}
+                  {item.type === 'Avaliativo' && (() => {
+                    // Determine effective input style - input_style takes priority, then fallback to scale_type mapping
+                    const getEffectiveInputStyle = () => {
+                      if (item.config?.input_style && item.config.input_style !== 'default') {
+                        return item.config.input_style;
+                      }
+                      // Map scale_type to input_style
+                      const scaleType = item.config?.scale_type;
+                      if (scaleType === 'faces_3') return 'smile_3';
+                      if (scaleType === 'faces_2') return 'smile_2'; // Same visual as smile_3 but 2 options
+                      if (scaleType === 'ns') return 'n_s';
+                      return 'default';
+                    };
+                    const effectiveStyle = getEffectiveInputStyle();
+
+                    return (
+                      <div className="flex gap-2">
+                        {/* Padrão (Texto) - only show when no scale_type or input_style is defined */}
+                        {effectiveStyle === 'default' && ['Conforme', 'Não Conforme', 'N/A'].map((opt) => (
+                          <button
+                            key={opt}
+                            onClick={() => setAnswers({ ...answers, [item.id]: createAnswer(opt) })}
+                            className={`flex-1 py-3 rounded-lg border text-xs font-bold transition-all ${answers[item.id]?.answer === opt
+                              ? (opt === 'Não Conforme' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-900 text-white border-blue-900')
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                              }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+
+                        {/* Thumbs (Joinha) */}
+                        {effectiveStyle === 'thumbs' && (
+                          <>
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Conforme') })}
+                              className={`flex-1 py-4 rounded-xl border-2 flex items-center justify-center gap-2 transition-all ${answers[item.id]?.answer === 'Conforme'
+                                ? 'bg-green-50 border-green-500 text-green-700'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <ThumbsUp size={24} weight={answers[item.id]?.answer === 'Conforme' ? "fill" : "regular"} />
+                            </button>
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Não Conforme') })}
+                              className={`flex-1 py-4 rounded-xl border-2 flex items-center justify-center gap-2 transition-all ${answers[item.id]?.answer === 'Não Conforme'
+                                ? 'bg-red-50 border-red-500 text-red-700'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <ThumbsDown size={24} weight={answers[item.id]?.answer === 'Não Conforme' ? "fill" : "regular"} />
+                            </button>
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('N/A') })}
+                              className={`w-16 py-4 rounded-xl border-2 flex items-center justify-center transition-all ${answers[item.id]?.answer === 'N/A'
+                                ? 'bg-slate-100 border-slate-400 text-slate-700'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <span className="font-bold text-xs">N/A</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Smileys (3 options) */}
+                        {effectiveStyle === 'smile_3' && (
+                          <>
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Conforme') })} // Good
+                              className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Conforme'
+                                ? 'bg-green-50 border-green-500 text-green-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <Smile size={32} />
+                              <span className="text-[10px] font-bold">Bom</span>
+                            </button>
+
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Regular') })} // Regular (Warning?) - Wait, standard is Conforme/Nao Conforme. 
+                              // Usually Smile 3 maps to Good/Regular/Bad? Or Yes/Maybe/No?
+                              // Integrating with existing logic: 'Regular' acts as... depends on backend logic.
+                              // Let's assume 'Regular' is valid but flagged? Or just a value. 
+                              // But usually backend expects 'Conforme'/'Não Conforme'. 
+                              // If user selected 'smile_3', we probably want to save 'Regular' as the answer string.
+                              // The backend handles strings, so it's fine.
+                              className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Regular'
+                                ? 'bg-yellow-50 border-yellow-500 text-yellow-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <Meh size={32} />
+                              <span className="text-[10px] font-bold">Regular</span>
+                            </button>
+
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Não Conforme') })} // Bad
+                              className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Não Conforme'
+                                ? 'bg-red-50 border-red-500 text-red-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <Frown size={32} />
+                              <span className="text-[10px] font-bold">Ruim</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Smileys (2 options) - Same visual as smile_3 */}
+                        {effectiveStyle === 'smile_2' && (
+                          <>
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Bom') })}
+                              className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Bom'
+                                ? 'bg-green-50 border-green-500 text-green-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <Smile size={32} />
+                              <span className="text-[10px] font-bold">Bom</span>
+                            </button>
+
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Ruim') })}
+                              className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Ruim'
+                                ? 'bg-red-50 border-red-500 text-red-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <Frown size={32} />
+                              <span className="text-[10px] font-bold">Ruim</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* Happy / Sad (2 options) */}
+                        {effectiveStyle === 'happy_sad' && (
+                          <>
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Conforme') })}
+                              className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Conforme'
+                                ? 'bg-green-50 border-green-500 text-green-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <div className="text-4xl">🙂</div>
+                              <span className="text-[10px] font-bold">Feliz</span>
+                            </button>
+
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Não Conforme') })}
+                              className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'Não Conforme'
+                                ? 'bg-red-50 border-red-500 text-red-600'
+                                : 'bg-white border-slate-200 text-slate-400'
+                                }`}
+                            >
+                              <div className="text-4xl">☹️</div>
+                              <span className="text-[10px] font-bold">Triste</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* N / S Buttons */}
+                        {effectiveStyle === 'n_s' && (
+                          <div className="flex w-full gap-4 justify-center">
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Não') })}
+                              className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center transition-all ${answers[item.id]?.answer === 'Não'
+                                ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/30'
+                                : 'bg-white border-slate-200 text-red-600'
+                                }`}
+                            >
+                              <span className="text-4xl font-black">N</span>
+                            </button>
+
+                            <button
+                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Sim') })}
+                              className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center transition-all ${answers[item.id]?.answer === 'Sim'
+                                ? 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-500/30'
+                                : 'bg-white border-slate-200 text-green-600'
+                                }`}
+                            >
+                              <span className="text-4xl font-black">S</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* NUMÉRICO */}
                   {item.type === 'Numérico' && (
@@ -326,146 +565,221 @@ const InspectionScreen: React.FC = () => {
                     </div>
                   )}
 
-                  {/* FOTO/ANEXO */}
-                  {(item.config?.allow_photo || item.config?.allow_attachment) && (
-                    <div className="space-y-2">
-                      <label className="flex items-center justify-center gap-2 p-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-all">
-                        <span className="material-symbols-outlined text-blue-900 text-2xl">photo_camera</span>
-                        <span className="text-sm font-medium text-blue-900">
-                          {item.config?.allow_photo ? 'Tirar Foto' : 'Adicionar Anexo'}
-                        </span>
-                        <input
-                          type="file"
-                          accept={item.config?.allow_photo ? "image/*" : "*/*"}
-                          capture={item.config?.allow_photo ? "environment" : undefined}
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                // 1. Compress Image (Inline implementation for simplicity in this component)
-                                const compressImage = (fileToCompress: File): Promise<Blob> => {
-                                  return new Promise((resolve, reject) => {
-                                    const reader = new FileReader();
-                                    reader.readAsDataURL(fileToCompress);
-                                    reader.onload = (event) => {
-                                      const img = new Image();
-                                      img.src = event.target?.result as string;
-                                      img.onload = () => {
-                                        const canvas = document.createElement('canvas');
-                                        let width = img.width;
-                                        let height = img.height;
-                                        const MAX_WIDTH = 1920;
-                                        const MAX_HEIGHT = 1920;
+                  {/* FOTO/ANEXO - Only show if:
+                      1. allow_photo is true (Anexos Opcionais), OR
+                      2. mandatory condition is met (e.g., answered Ruim with rule 'ruim')
+                  */}
+                  {(() => {
+                    const val = answers[item.id]?.answer;
+                    const config = item.config || {};
+                    const requirePhotoOn = config.require_photo_on || [];
 
-                                        if (width > height) {
-                                          if (width > MAX_WIDTH) {
-                                            height *= MAX_WIDTH / width;
-                                            width = MAX_WIDTH;
-                                          }
-                                        } else {
-                                          if (height > MAX_HEIGHT) {
-                                            width *= MAX_HEIGHT / height;
-                                            height = MAX_HEIGHT;
-                                          }
-                                        }
+                    // Check if mandatory condition is met
+                    // Map different answer formats: text mode (Conforme/Não Conforme) and emoji mode (Bom/Regular/Ruim) and N/S mode (Sim/Não)
+                    const isMandatory =
+                      item.mandatory_attachment ||
+                      requirePhotoOn.includes('always') ||
+                      // N/S mode: Sim/Não
+                      (val === 'Sim' && requirePhotoOn.includes('sim')) ||
+                      (val === 'Não' && requirePhotoOn.includes('nao')) ||
+                      // Text mode: Conforme/Não Conforme
+                      (val === 'Conforme' && requirePhotoOn.includes('bom')) ||
+                      (val === 'Conforme' && requirePhotoOn.includes('sim')) ||
+                      (val === 'Não Conforme' && requirePhotoOn.includes('nao')) ||
+                      (val === 'Não Conforme' && requirePhotoOn.includes('ruim')) ||
+                      // Emoji mode: Bom/Regular/Ruim
+                      (val === 'Bom' && requirePhotoOn.includes('bom')) ||
+                      (val === 'Ruim' && requirePhotoOn.includes('ruim')) ||
+                      (val === 'Regular' && requirePhotoOn.includes('regular'));
 
-                                        canvas.width = width;
-                                        canvas.height = height;
-                                        const ctx = canvas.getContext('2d');
-                                        ctx?.drawImage(img, 0, 0, width, height);
+                    // Show field if: allow_photo OR mandatory condition met
+                    const shouldShow = config.allow_photo || isMandatory;
 
-                                        canvas.toBlob((blob) => {
-                                          if (blob) resolve(blob);
-                                          else reject(new Error('Falha na compressão'));
-                                        }, 'image/jpeg', 0.85);
-                                      };
-                                    };
-                                  });
-                                };
+                    if (!shouldShow) return null;
 
-                                console.log('🔄 Comprimindo imagem...', file.name);
-                                const compressedBlob = await compressImage(file);
-
-                                // 2. Generate unique filename
-                                const fileName = `${vehicleId}_${templateId}_${item.id}_${Date.now()}.jpg`;
-
-                                // Auxiliar para converter Blob em Base64 (para modo offline)
-                                const blobToBase64 = (blob: Blob): Promise<string> => {
-                                  return new Promise((resolve, reject) => {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => resolve(reader.result as string);
-                                    reader.onerror = reject;
-                                    reader.readAsDataURL(blob);
-                                  });
-                                };
-
-                                let publicUrl = '';
-                                let isOfflineImage = false;
-
-                                try {
-                                  console.log('☁️ Tentando upload online:', fileName);
-
-                                  // 3. Upload Online
-                                  const { error: uploadError } = await supabase.storage
-                                    .from('checklist-photos')
-                                    .upload(fileName, compressedBlob, {
-                                      contentType: 'image/jpeg',
-                                      upsert: false
-                                    });
-
-                                  if (uploadError) throw uploadError;
-
-                                  // 4. Get Public URL
-                                  const { data } = supabase.storage
-                                    .from('checklist-photos')
-                                    .getPublicUrl(fileName);
-
-                                  publicUrl = data.publicUrl;
-                                  console.log('✅ Upload Online Sucesso!');
-
-                                } catch (error) {
-                                  console.warn('⚠️ Falha no upload (provavelmente offline). Salvando localmente.', error);
-
-                                  // FALLBACK OFFLINE: Converter para Base64
-                                  publicUrl = await blobToBase64(compressedBlob);
-                                  isOfflineImage = true;
-                                }
-
-                                // 5. Save URL (or Base64) to answers
-                                const currentAnswer = answers[item.id] || createAnswer(null);
-                                setAnswers(prev => ({
-                                  ...prev,
-                                  [item.id]: {
-                                    ...currentAnswer,
-                                    imageUrl: publicUrl,
-                                    isOffline: isOfflineImage, // Flag para indicar que precisa de sync depois
-                                    fileName: fileName // Guarda o nome planejado
-                                  },
-                                  [item.id + '_file']: file.name
-                                }));
-
-                                if (isOfflineImage) {
-                                  alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
-                                } else {
-                                  alert('Imagem enviada com sucesso!');
-                                }
-
-                              } catch (error: any) {
-                                console.error('Erro crítico ao processar imagem:', error);
-                                alert('Erro ao processar imagem: ' + error.message);
-                              }
-                            }
-                          }}
-                        />
-                      </label>
-                      {answers[item.id + '_file'] && (
-                        <div className="text-xs text-slate-500 text-center">
-                          📷 {answers[item.id + '_file']}
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className={`flex items-center gap-2 text-sm font-bold uppercase transition-colors ${isMandatory ? 'text-red-500' : 'text-slate-500'}`}>
+                            <Camera size={16} />
+                            Evidência {isMandatory ? 'Obrigatória' : '(Opcional)'}
+                          </label>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <label className={`flex items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${isMandatory && !answers[item.id]?.imageUrl
+                          ? 'bg-red-50 border-red-300 hover:bg-red-100'
+                          : 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                          }`}>
+                          <Camera className={
+                            (() => {
+                              const val = answers[item.id]?.answer;
+                              const isMandatory =
+                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('nao')) ||
+                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('ruim')) ||
+                                (val === 'Regular' && item.config?.require_photo_on?.includes('regular'));
+
+                              if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
+                                return 'text-red-500';
+                              }
+                              return 'text-blue-900';
+                            })()
+                          } size={24} />
+                          <span className={`text-sm font-medium ${(() => {
+                            const val = answers[item.id]?.answer;
+                            const isMandatory =
+                              (val === 'Não Conforme' && item.config?.require_photo_on?.includes('nao')) ||
+                              (val === 'Não Conforme' && item.config?.require_photo_on?.includes('ruim')) ||
+                              (val === 'Regular' && item.config?.require_photo_on?.includes('regular'));
+
+                            if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
+                              return 'text-red-600';
+                            }
+                            return 'text-blue-900';
+                          })()
+                            }`}>
+                            {(() => {
+                              const val = answers[item.id]?.answer;
+                              const isMandatory =
+                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('nao')) ||
+                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('ruim')) ||
+                                (val === 'Regular' && item.config?.require_photo_on?.includes('regular'));
+
+                              if (isMandatory) return 'Foto Obrigatória!';
+                              return item.config?.allow_photo ? 'Tirar Foto' : 'Adicionar Anexo';
+                            })()}
+                          </span>
+                          <input
+                            type="file"
+                            accept={item.config?.allow_photo ? "image/*" : "*/*"}
+                            capture={item.config?.allow_photo ? "environment" : undefined}
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  // 1. Compress Image (Inline implementation for simplicity in this component)
+                                  const compressImage = (fileToCompress: File): Promise<Blob> => {
+                                    return new Promise((resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.readAsDataURL(fileToCompress);
+                                      reader.onload = (event) => {
+                                        const img = new Image();
+                                        img.src = event.target?.result as string;
+                                        img.onload = () => {
+                                          const canvas = document.createElement('canvas');
+                                          let width = img.width;
+                                          let height = img.height;
+                                          const MAX_WIDTH = 1920;
+                                          const MAX_HEIGHT = 1920;
+
+                                          if (width > height) {
+                                            if (width > MAX_WIDTH) {
+                                              height *= MAX_WIDTH / width;
+                                              width = MAX_WIDTH;
+                                            }
+                                          } else {
+                                            if (height > MAX_HEIGHT) {
+                                              width *= MAX_HEIGHT / height;
+                                              height = MAX_HEIGHT;
+                                            }
+                                          }
+
+                                          canvas.width = width;
+                                          canvas.height = height;
+                                          const ctx = canvas.getContext('2d');
+                                          ctx?.drawImage(img, 0, 0, width, height);
+
+                                          canvas.toBlob((blob) => {
+                                            if (blob) resolve(blob);
+                                            else reject(new Error('Falha na compressão'));
+                                          }, 'image/jpeg', 0.85);
+                                        };
+                                      };
+                                    });
+                                  };
+
+                                  console.log('🔄 Comprimindo imagem...', file.name);
+                                  const compressedBlob = await compressImage(file);
+
+                                  // 2. Generate unique filename
+                                  const fileName = `${vehicleId}_${templateId}_${item.id}_${Date.now()}.jpg`;
+
+                                  // Auxiliar para converter Blob em Base64 (para modo offline)
+                                  const blobToBase64 = (blob: Blob): Promise<string> => {
+                                    return new Promise((resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => resolve(reader.result as string);
+                                      reader.onerror = reject;
+                                      reader.readAsDataURL(blob);
+                                    });
+                                  };
+
+                                  let publicUrl = '';
+                                  let isOfflineImage = false;
+
+                                  try {
+                                    console.log('☁️ Tentando upload online:', fileName);
+
+                                    // 3. Upload Online
+                                    const { error: uploadError } = await supabase.storage
+                                      .from('checklist-photos')
+                                      .upload(fileName, compressedBlob, {
+                                        contentType: 'image/jpeg',
+                                        upsert: false
+                                      });
+
+                                    if (uploadError) throw uploadError;
+
+                                    // 4. Get Public URL
+                                    const { data } = supabase.storage
+                                      .from('checklist-photos')
+                                      .getPublicUrl(fileName);
+
+                                    publicUrl = data.publicUrl;
+                                    console.log('✅ Upload Online Sucesso!');
+
+                                  } catch (error) {
+                                    console.warn('⚠️ Falha no upload (provavelmente offline). Salvando localmente.', error);
+
+                                    // FALLBACK OFFLINE: Converter para Base64
+                                    publicUrl = await blobToBase64(compressedBlob);
+                                    isOfflineImage = true;
+                                  }
+
+                                  // 5. Save URL (or Base64) to answers
+                                  const currentAnswer = answers[item.id] || createAnswer(null);
+                                  setAnswers(prev => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      ...currentAnswer,
+                                      imageUrl: publicUrl,
+                                      isOffline: isOfflineImage, // Flag para indicar que precisa de sync depois
+                                      fileName: fileName // Guarda o nome planejado
+                                    },
+                                    [item.id + '_file']: file.name
+                                  }));
+
+                                  if (isOfflineImage) {
+                                    alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
+                                  } else {
+                                    alert('Imagem enviada com sucesso!');
+                                  }
+
+                                } catch (error: any) {
+                                  console.error('Erro crítico ao processar imagem:', error);
+                                  alert('Erro ao processar imagem: ' + error.message);
+                                }
+                              }
+                            }}
+                          />
+                        </label>
+                        {answers[item.id + '_file'] && (
+                          <div className="text-xs text-slate-500 text-center">
+                            📷 {answers[item.id + '_file']}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                 </div>
               );
@@ -488,13 +802,27 @@ const InspectionScreen: React.FC = () => {
           💾 Salvar Rascunho
         </button>
         <button
-          onClick={handleFinish}
+          onClick={handleCompleteClick}
           disabled={saving}
-          className="w-full bg-primary text-white py-4 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-blue-900 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
         >
           {saving ? 'Salvando...' : 'Finalizar Inspeção'}
         </button>
       </footer>
+      {/* Signature Modal Overlay */}
+      {showSignatureModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            <SignaturePad
+              title="Assinatura do Motorista"
+              subtitle="Assine abaixo para finalizar a inspeção"
+              required={true}
+              onSave={handleSignatureSave}
+              onCancel={() => setShowSignatureModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -11,7 +11,9 @@ import {
   MapPin,
   FileText,
   UserCheck,
-  Type
+  Type,
+  Megaphone,
+  Layers
 } from 'lucide-react';
 
 export const COLORS = {
@@ -24,6 +26,7 @@ export const COLORS = {
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard Operacional', icon: <LayoutDashboard size={20} /> },
   { id: 'history', label: 'Checklists Realizados', icon: <ClipboardCheck size={20} /> },
+  // { id: 'release-flows', label: 'Workflows (Fluxos)', icon: <Layers size={20} /> },
 
   {
     id: 'reports',
@@ -41,12 +44,14 @@ export const NAV_ITEMS = [
     icon: <Settings size={20} />,
     children: [
       { id: 'config-models', label: 'Checklists', icon: <FileText size={16} /> },
+      // { id: 'config-workflows', label: 'Workflows (Novo)', icon: <ClipboardCheck size={16} /> },
       { id: 'config-vehicles', label: 'Veículos (Frota)', icon: <Truck size={16} /> },
       { id: 'config-vtypes', label: 'Tipos de Veículo', icon: <Type size={16} /> },
       { id: 'config-profiles', label: 'Perfis de Acesso', icon: <UserCheck size={16} /> },
       { id: 'config-users', label: 'Usuários', icon: <Users size={16} /> },
       { id: 'config-branches', label: 'Filiais', icon: <MapPin size={16} /> },
       { id: 'config-routes', label: 'Rotas e Regiões', icon: <MapPin size={16} /> },
+      { id: 'config-announcements', label: 'Avisos do Sistema', icon: <Megaphone size={16} /> },
     ]
   }
 ];

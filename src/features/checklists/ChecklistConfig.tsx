@@ -27,7 +27,8 @@ import {
   Filter,
   Trash2,
   Users,
-  Clock
+  Clock,
+  Camera
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -40,6 +41,7 @@ import {
 } from '../../../types';
 import ChecklistVehicleTypes from './ChecklistVehicleTypes';
 import ChecklistUsers from './ChecklistUsers';
+import { useAuth } from '../../hooks/useAuth';
 
 interface AccordionProps {
   title: string;
@@ -149,6 +151,8 @@ interface AreaItem {
     allow_photo?: boolean;
     allow_attachment?: boolean;
     options?: string[]; // Legacy fallback
+    input_style?: 'default' | 'thumbs' | 'smile_3' | 'smile_5' | 'happy_sad' | 'n_s';
+    require_photo_on?: string[];
   };
 }
 
@@ -171,6 +175,8 @@ interface ChecklistConfigProps {
 }
 
 const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBack }) => {
+  const { user } = useAuth();
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('DADOS CADASTRAIS');
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({ geral: true });
 
@@ -189,8 +195,45 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     mandatory_signature: true,
     share_email: true,
     geo_fence_start: false,
-    geo_fence_end: false
+    geo_fence_end: false,
+    show_item_timestamps: false,
+    scoring_enabled: false,
+    min_score_to_pass: 70,
+    require_driver_signature: false, // Signature at completion
+    require_analyst_signature: false // Signature when analyzing
   });
+
+  // Versioning State
+  const [version, setVersion] = useState(1);
+  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('published');
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [loadingLock, setLoadingLock] = useState(false);
+
+  // Check valid usage to lock editing
+  useEffect(() => {
+    let isActive = true;
+
+    const checkLock = async () => {
+      if (!checklistId) return;
+
+      setLoadingLock(true);
+      const { count } = await supabase
+        .from('checklist_inspections')
+        .select('*', { count: 'exact', head: true })
+        .eq('checklist_template_id', checklistId);
+
+      if (isActive) {
+        setIsLocked((count || 0) > 0);
+        setLoadingLock(false);
+      }
+    };
+    checkLock();
+
+    return () => {
+      isActive = false;
+    };
+  }, [checklistId]);
 
   // PDF Customization
   const [pdfHeaderImage, setPdfHeaderImage] = useState<string>('');
@@ -247,9 +290,14 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setName(initialTemplate.name);
       setSubject(initialTemplate.subject);
       setDescription(initialTemplate.description);
-      setSettings(initialTemplate.settings);
+      setSettings(prev => ({ ...prev, ...initialTemplate.settings }));
       setSelectedVehicleTypes(initialTemplate.target_vehicle_types as any);
       setSelectedUsers(initialTemplate.assigned_user_ids);
+
+      // Versioning
+      setVersion((initialTemplate as any).version || 1);
+      setStatus((initialTemplate as any).status || 'published');
+      setGroupId((initialTemplate as any).group_id || initialTemplate.id);
 
       // Load PDF customization fields
       setPdfHeaderImage((initialTemplate as any).pdf_header_image || '');
@@ -264,7 +312,52 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setAnalysisTimerMinutes((initialTemplate as any).analysis_timer_minutes || null);
 
       if (initialTemplate.structure?.areas) {
-        setAreas(initialTemplate.structure.areas as any);
+        // Map DB structure to local state structure (snake_case -> camelCase)
+        const mappedAreas = initialTemplate.structure.areas.map((dbArea: any) => ({
+          id: dbArea.id,
+          name: dbArea.name,
+          items: (dbArea.items || []).map((dbItem: any) => ({
+            id: dbItem.id,
+            name: dbItem.name,
+            type: dbItem.type,
+            mandatoryAttachment: dbItem.mandatory_attachment || false,
+            scaleType: dbItem.config?.scale_type || undefined,
+            config: {
+              registryOptions: dbItem.config?.registry_type ? [dbItem.config.registry_type] : [],
+              numericOption: dbItem.config?.numeric_option || '',
+              selectionType: dbItem.config?.selection_type || 'single',
+              selectionOptions: dbItem.config?.selection_options || dbItem.config?.options || [],
+              hint: dbItem.config?.hint || '',
+              allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
+              allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
+              input_style: dbItem.config?.input_style || 'default',
+              require_photo_on: dbItem.config?.require_photo_on || []
+            }
+          })),
+          subAreas: (dbArea.sub_areas || []).map((dbSub: any) => ({
+            id: dbSub.id,
+            name: dbSub.name,
+            items: (dbSub.items || []).map((dbItem: any) => ({
+              id: dbItem.id,
+              name: dbItem.name,
+              type: dbItem.type,
+              mandatoryAttachment: dbItem.mandatory_attachment || false,
+              scaleType: dbItem.config?.scale_type || undefined,
+              config: {
+                registryOptions: dbItem.config?.registry_type ? [dbItem.config.registry_type] : [],
+                numericOption: dbItem.config?.numeric_option || '',
+                selectionType: dbItem.config?.selection_type || 'single',
+                selectionOptions: dbItem.config?.selection_options || dbItem.config?.options || [],
+                hint: dbItem.config?.hint || '',
+                allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
+                allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
+                input_style: dbItem.config?.input_style || 'default',
+                require_photo_on: dbItem.config?.require_photo_on || []
+              }
+            }))
+          }))
+        }));
+        setAreas(mappedAreas);
       }
     } else {
       // Setup for a new template
@@ -280,7 +373,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         mandatory_signature: true,
         share_email: true,
         geo_fence_start: false,
-        geo_fence_end: false
+        geo_fence_end: false,
+        show_item_timestamps: false,
+        scoring_enabled: false,
+        min_score_to_pass: 70,
+        require_driver_signature: false,
+        require_analyst_signature: false
       });
       setSelectedVehicleTypes([]);
       setSelectedUsers([]);
@@ -297,6 +395,19 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     }
     setActiveTab('DADOS CADASTRAIS');
   }, [initialTemplate]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setCompanyId(data.company_id);
+        });
+    }
+  }, [user]);
 
   // Fetch available approvers (users with approval permission or all managers)
   useEffect(() => {
@@ -369,8 +480,10 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 selection_type: item.config?.selectionType,
                 selection_options: item.config?.selectionOptions || (item.config as any)?.options || [],
                 options: item.config?.selectionOptions || (item.config as any)?.options || [],
-                allow_photo: item.mandatoryAttachment, // Add photo capability for mobile
-                allow_attachment: item.mandatoryAttachment // Add attachment capability for mobile
+                allow_photo: item.mandatoryAttachment,
+                allow_attachment: item.mandatoryAttachment,
+                input_style: (item.config as any)?.input_style,
+                require_photo_on: (item.config as any)?.require_photo_on
               }
             })) || [],
             sub_areas: area.subAreas?.map(sub => ({
@@ -389,8 +502,10 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   selection_type: sitem.config?.selectionType,
                   selection_options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [],
                   options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [],
-                  allow_photo: sitem.mandatoryAttachment, // Add photo capability for mobile
-                  allow_attachment: sitem.mandatoryAttachment // Add attachment capability for mobile
+                  allow_photo: sitem.mandatoryAttachment,
+                  allow_attachment: sitem.mandatoryAttachment,
+                  input_style: (sitem.config as any)?.input_style,
+                  require_photo_on: (sitem.config as any)?.require_photo_on
                 }
               })) || []
             })) || []
@@ -408,7 +523,18 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         analysis_second_approver: analysisApprovalsCount === 2 ? analysisSecondApprover : null,
         analysis_has_timer: analysisHasTimer,
         analysis_timer_minutes: analysisHasTimer ? analysisTimerMinutes : null,
-        updated_at: new Date().toISOString()
+        // Scoring Fields (Extract from settings or state)
+        scoring_enabled: settings.scoring_enabled,
+        min_score_to_pass: settings.min_score_to_pass,
+
+        updated_at: new Date().toISOString(),
+        published_at: new Date().toISOString(),
+        // @ts-ignore
+        company_id: companyId,
+        // Versioning Columns
+        version: version || 1,
+        status: status || 'published',
+        group_id: groupId || checklistId
       };
 
       console.log('performSave: Saving template to DB:', JSON.stringify(checklistData.structure, null, 2)); // DEBUG
@@ -441,7 +567,144 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     }
   };
 
+
+
   const handleSave = () => performSave(false);
+
+  const handleCreateVersion = async () => {
+    if (!confirm(`Deseja criar a versão ${version + 1} deste checklist?`)) return;
+
+    try {
+      const newId = `chk_${Date.now()}`; // Temporary ID, let DB/Upsert handle if simpler
+      // Actually performSave uses upsert. 
+      // We need to Force Insert as new row.
+
+      // We'll manually construct the data and insert
+      const newData = {
+        // ... (Common data construction done in performSave, but we need to duplicate logic or refactor)
+        // Refactoring performSave to return data object would be ideal, but let's just do it here for safety
+        id: newId, // explicit ID
+        name: name,
+        subject: subject,
+        description: description,
+        settings: settings,
+        structure: {
+          areas: areas?.map(area => ({
+            id: area.id,
+            name: area.name,
+            type: 'Padrão',
+            items: area.items?.map(item => ({
+              id: item.id,
+              name: item.name,
+              type: item.type as ItemType,
+              mandatory_attachment: item.mandatoryAttachment,
+              config: {
+                hint: item.config?.hint,
+                scale_type: item.scaleType as any,
+                numeric_option: item.config?.numericOption,
+                registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined,
+                selection_type: item.config?.selectionType,
+                selection_options: item.config?.selectionOptions || (item.config as any)?.options || [],
+                allow_photo: item.mandatoryAttachment,
+                allow_attachment: item.mandatoryAttachment,
+                input_style: (item.config as any)?.input_style,
+                require_photo_on: (item.config as any)?.require_photo_on
+              }
+            })) || [],
+            sub_areas: area.subAreas?.map(sub => ({
+              id: sub.id,
+              name: sub.name,
+              items: sub.items?.map(sitem => ({
+                id: sitem.id,
+                name: sitem.name,
+                type: sitem.type as ItemType,
+                mandatory_attachment: sitem.mandatoryAttachment,
+                config: {
+                  hint: sitem.config?.hint,
+                  scale_type: sitem.scaleType as any,
+                  numeric_option: sitem.config?.numericOption,
+                  registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
+                  selection_type: sitem.config?.selectionType,
+                  selection_options: sitem.config?.selectionOptions || (sitem.config as any)?.options || [],
+                  allow_photo: sitem.mandatoryAttachment,
+                  allow_attachment: sitem.mandatoryAttachment,
+                  input_style: (sitem.config as any)?.input_style,
+                  require_photo_on: (sitem.config as any)?.require_photo_on
+                }
+              })) || []
+            })) || []
+          })) || []
+        },
+        target_vehicle_types: selectedVehicleTypes,
+        assigned_user_ids: selectedUsers,
+        requires_analysis: requiresAnalysis,
+        analysis_approvals_count: analysisApprovalsCount,
+        analysis_first_approver: analysisFirstApprover,
+        analysis_second_approver: analysisApprovalsCount === 2 ? analysisSecondApprover : null,
+        analysis_has_timer: analysisHasTimer,
+        analysis_timer_minutes: analysisHasTimer ? analysisTimerMinutes : null,
+        scoring_enabled: settings.scoring_enabled,
+        min_score_to_pass: settings.min_score_to_pass,
+        updated_at: new Date().toISOString(),
+        company_id: companyId,
+
+        // Versioning Columns
+        version: version + 1,
+        status: 'draft',
+        group_id: groupId || checklistId
+      };
+
+      const { data, error } = await supabase
+        .from('checklist_templates')
+        .insert(newData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      alert(`Rascunho da versão ${data.version} criado!`);
+      // Reload page or update state to new ID
+      // Simpler to reload or just call onBack then onEdit(new) but we are inside component
+      // Let's update state to point to new template
+      setChecklistId(data.id);
+      setVersion(data.version);
+      setStatus('draft');
+      setIsLocked(false); // New draft is editable
+
+    } catch (error: any) {
+      alert('Erro ao criar versão: ' + error.message);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!confirm('Ao publicar, esta versão se tornará a ativa e a anterior será arquivada. Continuar?')) return;
+
+    try {
+      // 1. Archive others in group
+      await supabase
+        .from('checklist_templates')
+        .update({ status: 'archived' })
+        .eq('group_id', groupId)
+        .eq('status', 'published')
+        .neq('id', checklistId);
+
+      // 2. Publish current
+      const { error } = await supabase
+        .from('checklist_templates')
+        .update({ status: 'published', published_at: new Date().toISOString() })
+        .eq('id', checklistId);
+
+      if (error) throw error;
+
+      alert('Versão publicada com sucesso!');
+      setStatus('published');
+      // Update lock status (it might be 0 inspections, so unlocked, but logically published usually implies "Ready")
+      // If we want to allow editing published items UNTIL they have inspections, we don't need to do anything.
+
+    } catch (error: any) {
+      alert('Erro ao publicar: ' + error.message);
+    }
+  };
 
   const deleteSubArea = (areaIdx: number, subAreaIdx: number) => {
     const newAreas = [...areas];
@@ -492,11 +755,17 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     }
   ];
 
+  // New configuration states
+  const [inputStyle, setInputStyle] = useState<'smile_5' | 'smile_3' | 'thumbs' | 'default'>('default');
+  const [requirePhotoOn, setRequirePhotoOn] = useState<string[]>([]);
+
   const resetItemForm = () => {
     setItemName('');
     setItemType('Avaliativo');
     setMandatoryAttachment(false);
     setScaleIdx(0);
+    setInputStyle('default');
+    setRequirePhotoOn([]);
     setRegistryOptions([]);
     setNumericOption('');
     setSelectionType('single');
@@ -536,6 +805,10 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         setRegistryOptions(item.config.registryOptions || []);
         setNumericOption(item.config.numericOption || (item.config as any).numeric_option || '');
 
+        // Load new fields
+        setInputStyle((item.config as any).input_style || 'default');
+        setRequirePhotoOn((item.config as any).require_photo_on || []);
+
         // FIX: Read selection_type from both camelCase (local state) and snake_case (database)
         const selType = item.config.selectionType || (item.config as any).selection_type || 'single';
         console.log('Setting selectionType to:', selType); // DEBUG
@@ -549,9 +822,10 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         setShowHint(!!item.config.hint);
       }
 
-      // Restore scale if applicable
-      if (item.scaleType) {
-        const foundIdx = scaleOptions.findIndex(s => s.id === item.scaleType);
+      // Restore scale if applicable - check both local (scaleType) and DB (config.scale_type)
+      const scaleTypeValue = item.scaleType || (item.config as any)?.scale_type;
+      if (scaleTypeValue) {
+        const foundIdx = scaleOptions.findIndex(s => s.id === scaleTypeValue);
         if (foundIdx !== -1) setScaleIdx(foundIdx);
       }
     }
@@ -592,7 +866,9 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         numericOption,
         selectionType,
         selectionOptions: finalSelectionOptions,
-        hint: hintText
+        hint: hintText,
+        input_style: itemType === 'Avaliativo' ? inputStyle : undefined,
+        require_photo_on: itemType === 'Avaliativo' ? requirePhotoOn : undefined
       }
     };
 
@@ -759,6 +1035,38 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         <Accordion title="Preenchimento" isOpen={!!openPanels.fill} onToggle={() => togglePanel('fill')}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
             <Toggle
+              label="Mostrar horário das respostas no relatório"
+              description="Exibe o timestamp exato de quando cada item foi respondido"
+              active={settings.show_item_timestamps || false}
+              onChange={(val) => setSettings(prev => ({ ...prev, show_item_timestamps: val }))}
+              badge="NOVO"
+            />
+            <div className="border-t border-slate-100 my-4 pt-4 col-span-1 md:col-span-2">
+              <Toggle
+                label="Ativar Sistema de Pontuação (Score)"
+                description="Habilita cálculo de nota (0-100) baseada nas respostas avaliativas"
+                active={settings.scoring_enabled || false}
+                onChange={(val) => setSettings(prev => ({ ...prev, scoring_enabled: val }))}
+                badge="BETA"
+              />
+              {settings.scoring_enabled && (
+                <div className="mt-4 ml-12 animate-in slide-in-from-top-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Nota mínima para aprovação (%)</label>
+                  <div className="flex items-center gap-2 mt-1 w-32">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={settings.min_score_to_pass || 70}
+                      onChange={(e) => setSettings(prev => ({ ...prev, min_score_to_pass: parseInt(e.target.value) }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100 font-bold text-center"
+                    />
+                    <span className="font-bold text-slate-400">%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <Toggle
               label="Aplicar checklist somente pelo aplicativo"
               description="Quando habilitado, este template aparecerá apenas no aplicativo mobile"
               active={settings.app_only}
@@ -809,11 +1117,11 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 badge="EM BREVE"
               />
               <Toggle
-                label="Assinatura"
-                active={settings.mandatory_signature}
-                onChange={(val) => setSettings(prev => ({ ...prev, mandatory_signature: val }))}
-                disabled={true}
-                badge="EM BREVE"
+                label="Solicitar assinatura do motorista ao finalizar"
+                description="Exibe campo de assinatura digital antes de concluir o checklist"
+                active={settings.require_driver_signature}
+                onChange={(val) => setSettings(prev => ({ ...prev, require_driver_signature: val }))}
+                badge="NOVO"
               />
             </div>
           </div>
@@ -963,6 +1271,17 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Analyst Signature Toggle */}
+                <div className="pt-4 border-t border-slate-100">
+                  <Toggle
+                    label="Assinatura ao fazer análise"
+                    description="Solicita assinatura digital do responsável ao aprovar ou reprovar"
+                    active={settings.require_analyst_signature}
+                    onChange={(val) => setSettings(prev => ({ ...prev, require_analyst_signature: val }))}
+                    badge="NOVO"
+                  />
                 </div>
               </div>
             )}
@@ -1290,28 +1609,121 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
             {/* Dynamic Fields Configuration */}
             {itemType === 'Avaliativo' && (
               <div className="space-y-4 pt-2">
-                <label className="text-xs text-slate-500">Configure sua escala avaliativa e sua obrigatoriedade</label>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setScaleIdx((prev) => (prev > 0 ? prev - 1 : scaleOptions.length - 1))}
-                    className="w-8 h-8 rounded border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <div className="min-w-[120px] flex justify-center">
-                    {scaleOptions[scaleIdx]?.render()}
-                  </div>
-                  <button
-                    onClick={() => setScaleIdx((prev) => (prev < scaleOptions.length - 1 ? prev + 1 : 0))}
-                    className="w-8 h-8 rounded border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-                <div className="flex justify-center gap-2">
-                  {scaleOptions?.map((_, idx) => (
-                    <div key={idx} className={`w-2 h-2 rounded-full ${idx === scaleIdx ? 'bg-green-500' : 'bg-slate-200'}`}></div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Configuração da Escala</label>
+
+                {/* Scale Logic Selection */}
+                <div className="flex gap-4 mb-4">
+                  {scaleOptions.map((opt, idx) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setScaleIdx(idx)}
+                      className={`flex-1 p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${scaleIdx === idx
+                        ? 'border-blue-900 bg-blue-50/50 text-blue-900'
+                        : 'border-slate-200 hover:border-blue-200 text-slate-400'
+                        }`}
+                    >
+                      <span className="text-xs font-bold uppercase">{opt.label}</span>
+                      <div className="scale-75 origin-top">{opt.render()}</div>
+                    </button>
                   ))}
+                </div>
+
+                {/* Visual Style Selection */}
+                <div className="space-y-2 mb-4">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Estilo Visual</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'default', label: 'Padrão (Texto)' },
+                      { id: 'thumbs', label: 'Joinha (👍/👎)' },
+                      { id: 'smile_3', label: 'Carinhas (🙂/😐/☹️)' },
+                      { id: 'happy_sad', label: 'Feliz/Triste (🙂/☹️)' },
+                      { id: 'n_s', label: 'Botões N / S' }
+                    ].map(style => (
+                      <button
+                        key={style.id}
+                        onClick={() => setInputStyle(style.id as any)}
+                        className={`px-3 py-2 rounded-lg text-xs font-bold border ${inputStyle === style.id
+                          ? 'bg-blue-900 text-white border-blue-900'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Photo Requirements */}
+                <div className="space-y-2 p-3 bg-red-50 border border-red-100 rounded-xl" >
+                  <div className="flex items-center gap-2 text-red-800">
+                    <Camera size={14} />
+                    <span className="text-xs font-bold uppercase">Foto Obrigatória</span>
+                  </div>
+                  <p className="text-[10px] text-red-600/80">Selecione quando a foto será exigida:</p>
+
+                  <div className="flex flex-wrap gap-3">
+                    {/* Options based on currently selected scale logic */}
+
+                    {/* N/S scale - Sim and Não options */}
+                    {scaleOptions[scaleIdx].id === 'ns' && (
+                      ['sim', 'nao'].map(val => (
+                        <label key={val} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={requirePhotoOn.includes(val)}
+                            onChange={(e) => {
+                              if (e.target.checked) setRequirePhotoOn([...requirePhotoOn, val]);
+                              else setRequirePhotoOn(requirePhotoOn.filter(x => x !== val));
+                            }}
+                            className="rounded text-red-600 focus:ring-red-500 border-red-200"
+                          />
+                          <span className="text-xs font-bold text-red-700 uppercase">
+                            {val === 'sim' ? 'Ao marcar Sim' : 'Ao marcar Não'}
+                          </span>
+                        </label>
+                      ))
+                    )}
+
+                    {/* faces_2 (SMILE/FROWN) - Bom and Ruim options */}
+                    {scaleOptions[scaleIdx].id === 'faces_2' && (
+                      ['bom', 'ruim'].map(val => (
+                        <label key={val} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={requirePhotoOn.includes(val)}
+                            onChange={(e) => {
+                              if (e.target.checked) setRequirePhotoOn([...requirePhotoOn, val]);
+                              else setRequirePhotoOn(requirePhotoOn.filter(x => x !== val));
+                            }}
+                            className="rounded text-red-600 focus:ring-red-500 border-red-200"
+                          />
+                          <span className="text-xs font-bold text-red-700 uppercase">
+                            {val === 'bom' ? 'Ao marcar Bom' : 'Ao marcar Ruim'}
+                          </span>
+                        </label>
+                      ))
+                    )}
+
+                    {/* faces_3 (SMILE/MEH/FROWN) - Bom, Regular and Ruim options */}
+                    {scaleOptions[scaleIdx].id === 'faces_3' && (
+                      ['bom', 'regular', 'ruim'].map(val => (
+                        <label key={val} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={requirePhotoOn.includes(val)}
+                            onChange={(e) => {
+                              if (e.target.checked) setRequirePhotoOn([...requirePhotoOn, val]);
+                              else setRequirePhotoOn(requirePhotoOn.filter(x => x !== val));
+                            }}
+                            className="rounded text-red-600 focus:ring-red-500 border-red-200"
+                          />
+                          <span className="text-xs font-bold text-red-700 uppercase">
+                            {val === 'bom' ? 'Ao marcar Bom' : val === 'regular' ? 'Ao marcar Regular' : 'Ao marcar Ruim'}
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1528,7 +1940,13 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Configurar Checklist</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Configurar Checklist</h1>
+            <span className="bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded font-mono">v{version}</span>
+            {status === 'draft' && <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full uppercase font-bold">Rascunho</span>}
+            {status === 'published' && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full uppercase font-bold">Publicado</span>}
+            {isLocked && <div title="Bloqueado para edição direta"><Lock size={14} className="text-slate-400" /></div>}
+          </div>
         </div>
       </div>
 
@@ -1564,12 +1982,38 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
             </span>
           </button>
         </div>
-        <button
-          onClick={handleSave}
-          className="px-10 py-2.5 bg-blue-900 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-800 shadow-md transition-all active:scale-95"
-        >
-          Salvar
-        </button>
+        <div className="flex items-center gap-4">
+          {isLocked ? (
+            <button
+              onClick={handleCreateVersion}
+              className="px-10 py-2.5 bg-blue-900 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-800 shadow-md transition-all active:scale-95 flex items-center gap-2"
+            >
+              <Plus size={14} /> Criar Versão {version + 1}
+            </button>
+          ) : status === 'draft' ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-black text-xs uppercase tracking-wider hover:bg-slate-50 transition-all"
+              >
+                Salvar Rascunho
+              </button>
+              <button
+                onClick={handlePublish}
+                className="px-10 py-2.5 bg-green-600 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-green-500 shadow-md transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Check size={14} /> Publicar v{version}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleSave}
+              className="px-10 py-2.5 bg-blue-900 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-800 shadow-md transition-all active:scale-95 flex items-center gap-2"
+            >
+              <Check size={14} /> Salvar
+            </button>
+          )}
+        </div>
       </footer>
     </div>
   );

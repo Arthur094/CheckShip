@@ -4,6 +4,8 @@ import { ArrowLeft, Calendar, User, Truck, MapPin, CheckCircle, AlertTriangle, X
 import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
+import { calculateChecklistScore } from '../../utils/scoreCalculator';
+import SignaturePad from '../../components/common/SignaturePad';
 
 const InspectionDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -18,9 +20,30 @@ const InspectionDetails: React.FC = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [processing, setProcessing] = useState(false);
 
+    // Analyst Signature States
+    const [showAnalystSignatureModal, setShowAnalystSignatureModal] = useState(false);
+    const [analystSignatureUrl, setAnalystSignatureUrl] = useState<string | null>(null);
+    const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
+
+    // Fallback Score Calculation (for old inspections or missed saves)
+    const [calculatedScore, setCalculatedScore] = useState<{ score: number, passed: boolean } | null>(null);
+
     useEffect(() => {
         fetchInspectionDetails();
     }, [id]);
+
+    useEffect(() => {
+        if (inspection && structure && (inspection.score === null || inspection.score === undefined)) {
+            try {
+                // @ts-ignore
+                const result = calculateChecklistScore({ ...inspection.template, structure }, inspection.responses || {});
+                console.log('🔄 Score calculado localmente (Fallback):', result);
+                setCalculatedScore(result);
+            } catch (err) {
+                console.error('Erro ao calcular score localmente:', err);
+            }
+        }
+    }, [inspection, structure]);
 
     const fetchInspectionDetails = async () => {
         try {
@@ -99,8 +122,67 @@ const InspectionDetails: React.FC = () => {
         html2pdf().set(opt).from(element).save();
     };
 
-    const handleApprove = async () => {
-        if (!inspection || !id) return;
+
+
+    const handleAnalystSignatureSave = async (dataUrl: string) => {
+        setProcessing(true);
+        try {
+            // Fallback: save base64 directly if storage upload fails
+            const fileName = `${id}_analyst_${Date.now()}.png`;
+            let finalUrl = dataUrl;
+
+            try {
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+                const { data, error } = await supabase.storage
+                    .from('signatures')
+                    .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+
+                if (!error) {
+                    const { data: { publicUrl } } = supabase.storage.from('signatures').getPublicUrl(fileName);
+                    finalUrl = publicUrl;
+                }
+            } catch (e) {
+                console.warn('Signature upload failed, using base64 fallback');
+            }
+
+            setAnalystSignatureUrl(finalUrl);
+            setShowAnalystSignatureModal(false);
+
+            if (pendingAction === 'approve') {
+                handleApprove(finalUrl);
+            } else if (pendingAction === 'reject') {
+                handleReject(finalUrl);
+            }
+        } catch (error) {
+            console.error('Error saving signature:', error);
+            alert('Erro ao salvar assinatura.');
+        } finally {
+            setProcessing(false);
+            setPendingAction(null);
+        }
+    };
+
+    const handleApprove = async (signatureUrlOverride?: string) => {
+        console.log('✅ handleApprove called', { signatureUrlOverride, analystSignatureUrl, inspectionId: id });
+        if (!inspection || !id) {
+            console.error('❌ Inspection or ID missing');
+            return;
+        }
+
+        const requireSignature = inspection.template?.settings?.require_analyst_signature;
+        console.log('📝 Config require_analyst_signature:', requireSignature);
+
+        // Check for analyst signature requirement
+        const currentSignature = signatureUrlOverride || analystSignatureUrl;
+
+
+        if (requireSignature && !currentSignature) {
+            setPendingAction('approve');
+            setShowAnalystSignatureModal(true);
+            return;
+        }
+
         if (!window.confirm('Confirma a aprovação deste checklist?')) return;
 
         setProcessing(true);
@@ -115,6 +197,7 @@ const InspectionDetails: React.FC = () => {
             const updateData: any = {
                 analysis_current_step: currentStep,
                 updated_at: new Date().toISOString(),
+                ...(currentSignature && { analyst_signature_url: currentSignature })
             };
 
             // First or second approval
@@ -151,9 +234,19 @@ const InspectionDetails: React.FC = () => {
         }
     };
 
-    const handleReject = async () => {
+    const handleReject = async (signatureUrlOverride?: string) => {
         if (!inspection || !id || !rejectReason.trim()) {
             alert('Por favor, informe uma justificativa para a reprovação.');
+            return;
+        }
+
+        // Check for analyst signature requirement
+        const currentSignature = signatureUrlOverride || analystSignatureUrl;
+        const requireSignature = inspection.template?.settings?.require_analyst_signature;
+
+        if (requireSignature && !currentSignature) {
+            setPendingAction('reject');
+            setShowAnalystSignatureModal(true);
             return;
         }
 
@@ -169,6 +262,7 @@ const InspectionDetails: React.FC = () => {
                 status: 'rejected',
                 analysis_current_step: currentStep,
                 updated_at: new Date().toISOString(),
+                ...(currentSignature && { analyst_signature_url: currentSignature })
             };
 
             // Record who rejected and why
@@ -389,9 +483,10 @@ const InspectionDetails: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            {/* Card 1: Inspector */}
                             <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold overflow-hidden">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold overflow-hidden border-2 border-white shadow-sm">
                                     {inspection.user?.avatar_url ? (
                                         <img src={inspection.user.avatar_url} alt="User" className="w-full h-full object-cover" />
                                     ) : (
@@ -404,6 +499,7 @@ const InspectionDetails: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Card 2: Vehicle */}
                             <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                 <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-500 shadow-sm">
                                     <Truck size={18} />
@@ -415,6 +511,7 @@ const InspectionDetails: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Card 3: Date */}
                             <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                 <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-500 shadow-sm">
                                     <Calendar size={18} />
@@ -425,6 +522,31 @@ const InspectionDetails: React.FC = () => {
                                     <p className="text-xs text-slate-500">{new Date(inspection.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
                                 </div>
                             </div>
+
+                            {/* Card 4: Score (Conditional) */}
+                            {((inspection.template?.scoring_enabled || inspection.template?.settings?.scoring_enabled)) && (
+                                <div className={`flex items-center gap-4 p-4 rounded-xl border ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70)
+                                    ? 'bg-green-50 border-green-100'
+                                    : 'bg-red-50 border-red-100'
+                                    }`}>
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg shadow-sm ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70)
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-red-100 text-red-700'
+                                        }`}>
+                                        {Math.round(inspection.score ?? calculatedScore?.score ?? 0)}
+                                    </div>
+                                    <div>
+                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'text-green-600' : 'text-red-600'
+                                            }`}>
+                                            Pontuação
+                                        </p>
+                                        <p className={`text-sm font-bold ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'text-green-800' : 'text-red-800'
+                                            }`}>
+                                            {(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'Aprovado' : 'Reprovado'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                     {structure?.areas?.map((area: any, idx: number) => (
@@ -437,7 +559,7 @@ const InspectionDetails: React.FC = () => {
 
                                 <div className="divide-y divide-slate-100">
                                     {/* Render Area Items */}
-                                    {area.items?.map((item: any) => renderReportItem(item, getAnswer(item.id)))}
+                                    {area.items?.map((item: any) => renderReportItem(item, getAnswer(item.id), inspection.template?.settings?.show_item_timestamps))}
 
                                     {/* Render SubAreas */}
                                     {area.subAreas?.map((sub: any) => (
@@ -446,7 +568,7 @@ const InspectionDetails: React.FC = () => {
                                                 <span className="text-xs font-black uppercase text-slate-500 tracking-wider">Sub-área: {sub.name}</span>
                                             </div>
                                             <div className="divide-y divide-slate-100">
-                                                {sub.items?.map((sitem: any) => renderReportItem(sitem, getAnswer(sitem.id)))}
+                                                {sub.items?.map((sitem: any) => renderReportItem(sitem, getAnswer(sitem.id), inspection.template?.settings?.show_item_timestamps))}
                                             </div>
                                         </div>
                                     ))}
@@ -454,94 +576,163 @@ const InspectionDetails: React.FC = () => {
                             </div>
                         </section>
                     ))}
-                </main>
+                    {/* SIGNATURES SECTION - PRINT ONLY */}
+                    <div className="mt-12 pt-8 border-t border-slate-200 break-inside-avoid">
+                        <h3 className="text-lg font-bold text-slate-800 mb-6">Assinaturas</h3>
+                        <div className="flex flex-col md:flex-row justify-between gap-12">
+                            {/* Driver Signature */}
+                            <div className="flex-1 flex flex-col items-center">
+                                <div className="h-32 w-full max-w-xs border-b border-slate-400 mb-2 flex items-end justify-center">
+                                    {inspection.driver_signature_url ? (
+                                        <img src={inspection.driver_signature_url} alt="Assinatura Motorista" className="h-28 object-contain" />
+                                    ) : (
+                                        <span className="text-slate-400 text-sm mb-4 italic">Não assinado</span>
+                                    )}
+                                </div>
+                                <p className="font-bold text-slate-800">Assinatura do Motorista/Responsável</p>
+                                <p className="text-sm text-slate-500">{new Date(inspection.completed_at || inspection.updated_at).toLocaleDateString('pt-BR')}</p>
+                            </div>
 
-
-            </div>
-
-            {/* Analysis Footer - Only show in analysis mode with pending status */}
-            {isAnalysisMode && inspection.status === 'pending' && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
-                    <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm text-slate-600">Etapa</span>
-                            <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-black">
-                                {inspection.analysis_current_step || 0}/{inspection.analysis_total_steps || 1}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => setShowRejectModal(true)}
-                                disabled={processing}
-                                className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
-                            >
-                                <XOctagon size={18} />
-                                REPROVAR
-                            </button>
-                            <button
-                                onClick={handleApprove}
-                                disabled={processing}
-                                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
-                            >
-                                <CheckCircle2 size={18} />
-                                APROVAR
-                            </button>
+                            {/* Analyst Signature */}
+                            {(inspection.analysis_status === 'approved' || inspection.analysis_status === 'rejected') && (
+                                <div className="flex-1 flex flex-col items-center">
+                                    <div className="h-32 w-full max-w-xs border-b border-slate-400 mb-2 flex items-end justify-center">
+                                        {inspection.analyst_signature_url ? (
+                                            <img src={inspection.analyst_signature_url} alt="Assinatura Analista" className="h-28 object-contain" />
+                                        ) : (
+                                            <span className="text-slate-400 text-sm mb-4 italic">Assinado Digitalmente</span>
+                                        )}
+                                    </div>
+                                    <p className="font-bold text-slate-800">Assinatura do Analista</p>
+                                    <p className="text-sm text-slate-500">
+                                        {inspection.analysis_status === 'approved' ? 'Aprovado' : 'Reprovado'} em {new Date(inspection.updated_at).toLocaleDateString('pt-BR')}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-            )}
+                </main >
+
+
+            </div >
+
+            {/* Analysis Footer - Only show in analysis mode with pending status */}
+            {
+                isAnalysisMode && inspection.status === 'pending' && (
+                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
+                        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-slate-600">Etapa</span>
+                                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-black">
+                                    {inspection.analysis_current_step || 0}/{inspection.analysis_total_steps || 1}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => setShowRejectModal(true)}
+                                    disabled={processing}
+                                    className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+                                >
+                                    <XOctagon size={18} />
+                                    REPROVAR
+                                </button>
+                                <button
+                                    onClick={() => handleApprove()}
+                                    disabled={processing}
+                                    className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50"
+                                >
+                                    <CheckCircle2 size={18} />
+                                    APROVAR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             {/* Reject Modal */}
-            {showRejectModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setShowRejectModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4">Justificativa da Reprovação</h3>
-                        <textarea
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            placeholder="Informe o motivo da reprovação..."
-                            className="w-full h-32 p-4 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
-                        />
-                        <div className="flex justify-end gap-3 mt-4">
-                            <button
-                                onClick={() => setShowRejectModal(false)}
-                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-bold transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleReject}
-                                disabled={processing || !rejectReason.trim()}
-                                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
-                            >
-                                {processing ? 'Processando...' : 'Confirmar Reprovação'}
-                            </button>
+            {
+                showRejectModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onClick={() => setShowRejectModal(false)}>
+                        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-slate-800 mb-4">Justificativa da Reprovação</h3>
+                            <textarea
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Informe o motivo da reprovação..."
+                                className="w-full h-32 p-4 border border-slate-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none"
+                            />
+                            <div className="flex justify-end gap-3 mt-4">
+                                <button
+                                    onClick={() => setShowRejectModal(false)}
+                                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-bold transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => handleReject()}
+                                    disabled={processing || !rejectReason.trim()}
+                                    className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                                >
+                                    {processing ? 'Processando...' : 'Confirmar Reprovação'}
+                                </button>
+                            </div>
                         </div>
+                    </div>
+                )
+            }
+
+            {/* Analyst Signature Modal */}
+            {showAnalystSignatureModal && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg animate-in slide-in-from-bottom-4 duration-300">
+                        <SignaturePad
+                            title="Assinatura do Analista"
+                            subtitle={`Assine abaixo para confirmar a ${pendingAction === 'approve' ? 'aprovação' : 'reprovação'}`}
+                            required={true}
+                            height={120}
+                            onSave={handleAnalystSignatureSave}
+                            onCancel={() => {
+                                setShowAnalystSignatureModal(false);
+                                setPendingAction(null);
+                            }}
+                        />
                     </div>
                 </div>
             )}
 
             {/* DEBUG INFO REMOVED */}
-        </div>
+        </div >
     );
 };
 
 // Helper to render individual item report
-function renderReportItem(item: any, answerData: any) {
+function renderReportItem(item: any, answerData: any, showTimestamps: boolean = false) {
     const answer = answerData?.answer;
     const observation = answerData?.observation;
     const photos = answerData?.photos || [];
-    const imageUrl = answerData?.imageUrl; // ← Nova linha
+    const imageUrl = answerData?.imageUrl;
+    const answeredAt = answerData?.answered_at; // ← Recupera timestamp
 
     return (
         <div key={item.id} className="p-6 hover:bg-slate-50/50 transition-colors">
             <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1">
-                    <div className="flex items-start gap-3 mb-2">
-                        <span className="mt-1 text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase border border-slate-200 shrink-0">
-                            {item.type}
-                        </span>
-                        <h4 className="text-sm font-bold text-slate-800 leading-snug">{item.name}</h4>
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-start gap-3">
+                            <span className="mt-1 text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase border border-slate-200 shrink-0">
+                                {item.type}
+                            </span>
+                            <h4 className="text-sm font-bold text-slate-800 leading-snug">{item.name}</h4>
+                        </div>
+
+                        {/* Timestamp Display */}
+                        {showTimestamps && answeredAt && (
+                            <div className="flex items-center gap-1.5 text-[10px] bg-slate-100 px-2 py-1 rounded-full text-slate-500 border border-slate-200" title="Horário da resposta">
+                                <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                {new Date(answeredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Observation */}
@@ -583,12 +774,16 @@ function renderReportItem(item: any, answerData: any) {
                     )}
                 </div>
 
+
+
+
+
                 {/* Answer Display */}
                 <div className="w-full md:w-48 shrink-0 flex flex-col items-end md:justify-center">
                     {renderAnswerValue(item, answer)}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
@@ -600,17 +795,40 @@ function renderAnswerValue(item: any, answer: any) {
     // Smileys / Evaluative
     if (item.type === 'Avaliativo') {
         // Faces logic consistent with InspectionForm
-        if (answer === 'conforme' || answer === 'bom' || answer === 'otimo') {
-            return <div className="flex flex-col items-center"><CheckCircle className="text-green-500 mb-1" size={28} /><span className="text-xs font-bold text-green-600 uppercase">Aprovado</span></div>;
+        if (answer === 'conforme' || answer === 'bom' || answer === 'otimo' || answer === 'sim') {
+            return (
+                <div className="flex flex-col items-center">
+                    <CheckCircle className="text-green-500 mb-1" size={28} />
+                    <span className="text-xs font-bold text-green-600 uppercase">Conforme</span>
+                    {/* Show +10pts if needed, maybe logic dependent */}
+                </div>
+            );
         }
-        if (answer === 'nao_conforme' || answer === 'ruim' || answer === 'pessimo') {
-            return <div className="flex flex-col items-center"><XCircle className="text-red-500 mb-1" size={28} /><span className="text-xs font-bold text-red-600 uppercase">Reprovado</span></div>;
+        if (answer === 'nao_conforme' || answer === 'ruim' || answer === 'pessimo' || answer === 'nao') {
+            return (
+                <div className="flex flex-col items-center">
+                    <XCircle className="text-red-500 mb-1" size={28} />
+                    <span className="text-xs font-bold text-red-600 uppercase">Não Conforme</span>
+                </div>
+            );
         }
         if (answer === 'regular' || answer === 'meh') {
-            return <div className="flex flex-col items-center"><AlertTriangle className="text-yellow-500 mb-1" size={28} /><span className="text-xs font-bold text-yellow-600 uppercase">Regular</span></div>;
+            return (
+                <div className="flex flex-col items-center">
+                    <AlertTriangle className="text-yellow-500 mb-1" size={28} />
+                    <span className="text-xs font-bold text-yellow-600 uppercase">Regular</span>
+                </div>
+            );
         }
-        return <span className="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold uppercase">{answer}</span>;
+        return (
+            <div className="flex flex-col items-end gap-1">
+                <span className="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold uppercase">{answer}</span>
+                {/* Points Display (Future: Pass logic to know if points were earned) */}
+                {/* For now, simplified assumption logic for visual feedback */}
+            </div>
+        );
     }
+
 
     // Arrays (Multiple Selection)
     if (Array.isArray(answer)) {

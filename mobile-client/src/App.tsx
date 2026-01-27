@@ -10,6 +10,7 @@ import InspectionScreen from './components/screens/InspectionScreen';
 import CompletedScreen from './components/screens/CompletedScreen';
 import ProfileScreen from './components/screens/ProfileScreen';
 import AnalysisScreen from './components/screens/AnalysisScreen';
+import AnnouncementBanner from './components/AnnouncementBanner';
 
 const AuthContext = createContext<{
   session: any | null;
@@ -37,16 +38,19 @@ const AppRoutes = () => {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard" element={<DashboardScreen />} />
-      <Route path="/vehicles" element={<VehicleSelectScreen />} />
-      <Route path="/template/:vehicleId" element={<TemplateSelectScreen />} />
-      <Route path="/inspection/:vehicleId/:templateId" element={<InspectionScreen />} />
-      <Route path="/completed" element={<CompletedScreen />} />
-      <Route path="/analysis" element={<AnalysisScreen />} />
-      <Route path="/profile" element={<ProfileScreen />} />
-    </Routes>
+    <>
+      <AnnouncementBanner platform="mobile" />
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardScreen />} />
+        <Route path="/vehicles" element={<VehicleSelectScreen />} />
+        <Route path="/template/:vehicleId" element={<TemplateSelectScreen />} />
+        <Route path="/inspection/:vehicleId/:templateId" element={<InspectionScreen />} />
+        <Route path="/completed" element={<CompletedScreen />} />
+        <Route path="/analysis" element={<AnalysisScreen />} />
+        <Route path="/profile" element={<ProfileScreen />} />
+      </Routes>
+    </>
   );
 };
 

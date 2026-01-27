@@ -10,12 +10,20 @@ import ChecklistList from './src/features/checklists/ChecklistList';
 import AccessProfiles from './src/features/access-profiles/AccessProfiles';
 import UserManagement from './src/features/users/UserManagement';
 import VehicleTypeManagement from './src/features/fleets/VehicleTypeManagement';
+import Announcements from './src/features/settings/Announcements';
 import LoginPage from './components/LoginPage';
 import { HelpCircle, Bell, Search as SearchIcon } from 'lucide-react';
 
 import StartInspectionModal from './src/features/inspections/StartInspectionModal';
 import InspectionForm from './src/features/inspections/InspectionForm';
 import InspectionDetails from './src/features/inspections/InspectionDetails';
+import AnnouncementBanner from './src/components/common/AnnouncementBanner';
+import WorkflowList from './src/features/workflows/WorkflowList';
+import WorkflowConfig from './src/features/workflows/WorkflowConfig';
+import ReleaseFlowList from './src/features/workflows/ReleaseFlowList';
+import ReleaseFlowDetail from './src/features/workflows/ReleaseFlowDetail';
+
+
 
 
 
@@ -40,10 +48,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
   }, [initialTab, location.state]);
 
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<any>(null);
 
   // Inspection State
   const [showInspectionModal, setShowInspectionModal] = useState(false);
-  const [activeInspection, setActiveInspection] = useState<{ checklistId: string, vehicleId: string } | null>(null);
+  // const [showReleaseFlowModal, setShowReleaseFlowModal] = useState(false);
+  const [activeInspection, setActiveInspection] = useState<{ checklistId: string, vehicleId: string, itemExecutionId?: string } | null>(null);
+  const [activeReleaseFlowId, setActiveReleaseFlowId] = useState<string | null>(null);
 
   const renderContent = () => {
     // If there is an active inspection, render the form FULL SCREEN (overriding tab content)
@@ -52,7 +63,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
         <InspectionForm
           checklistId={activeInspection.checklistId}
           vehicleId={activeInspection.vehicleId}
-          onClose={() => setActiveInspection(null)}
+          onClose={async () => {
+            // If part of execution, mark item as done
+            if (activeInspection.itemExecutionId) {
+              await supabase
+                .from('workflow_execution_items')
+                .update({ status: 'completed' })
+                .eq('id', activeInspection.itemExecutionId);
+            }
+            setActiveInspection(null);
+          }}
         />
       );
     }
@@ -70,6 +90,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
         return <VehicleTypeManagement />;
       case 'config-profiles':
         return <AccessProfiles />;
+      case 'config-announcements':
+        return <Announcements />;
       case 'config-models':
         return (
           <ChecklistList
@@ -90,6 +112,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
             onBack={() => setActiveTab('config-models')}
           />
         );
+      case 'config-workflows':
+        return (
+          <WorkflowList
+            onNew={() => {
+              setSelectedWorkflow(null);
+              setActiveTab('config-workflow-editor');
+            }}
+            onEdit={(workflow) => {
+              setSelectedWorkflow(workflow);
+              setActiveTab('config-workflow-editor');
+            }}
+          />
+        );
+      case 'config-workflow-editor':
+        return (
+          <WorkflowConfig
+            initialWorkflow={selectedWorkflow}
+            onBack={() => setActiveTab('config-workflows')}
+          />
+        );
+      case 'release-flows':
+        return (
+          <ReleaseFlowList
+            onNew={() => setShowInspectionModal(true)}
+          />
+        );
+      case 'release-flow-detail':
+        return activeReleaseFlowId ? (
+          <ReleaseFlowDetail
+            executionId={activeReleaseFlowId}
+            onBack={() => {
+              setActiveReleaseFlowId(null);
+              setActiveTab('release-flows');
+            }}
+            onStartInspection={(templateId, vehicleId, itemId) => {
+              setActiveInspection({ checklistId: templateId, vehicleId: vehicleId, itemExecutionId: itemId });
+            }}
+          />
+        ) : null;
       default:
         return (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 p-20 animate-pulse">
@@ -110,18 +171,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
             setShowInspectionModal(false);
             setActiveInspection({ checklistId, vehicleId });
           }}
+          onStartWorkflow={(executionId) => {
+            setShowInspectionModal(false);
+            setActiveReleaseFlowId(executionId);
+            setActiveTab('release-flow-detail');
+          }}
         />
       )}
+
+      {/* Release Flow Modal (Deprecated) */}
+      {/* {showReleaseFlowModal && ( ... )} */}
+
+
+      {/* Release Flow Modal Removed */}
+
 
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onStartInspection={() => setShowInspectionModal(true)}
+      // We'll update Sidebar to support distinct actions if needed
       />
 
       {/* Main Content Wrapper */}
-      <main className="flex-1 ml-72 flex flex-col min-w-0">
+      {/* Main Content Wrapper */}
+      <main className="flex-1 ml-72 flex flex-col min-w-0 relative">
+        <AnnouncementBanner platform="web" />
         {/* Header removed per user request */}
 
         {/* Dynamic Page Content */}
@@ -197,6 +273,22 @@ const App: React.FC = () => {
           <Route path="/ckrealizados" element={
             <ForcePasswordChangeGuard>
               <MainLayout initialTab="history" />
+            </ForcePasswordChangeGuard>
+          } />
+
+          <Route path="/announcements" element={
+            <ForcePasswordChangeGuard>
+              <MainLayout initialTab="config-announcements" />
+            </ForcePasswordChangeGuard>
+          } />
+
+          <Route path="/release-flows/:id" element={
+            <ForcePasswordChangeGuard>
+              <MainLayout initialTab="release-flows" />
+              {/* Note: Logic to auto-open the detail needed, or just handle inside MainLayout via URL params? 
+                  For simplicity let's stick to state routing inside MainLayout for now, 
+                  or update MainLayout to read URL params.
+              */}
             </ForcePasswordChangeGuard>
           } />
 

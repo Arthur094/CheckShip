@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ChevronUp, Play, LogOut, UserCircle, KeyRound, User } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Play, LogOut, UserCircle, KeyRound, User, Layers, BarChart3 } from 'lucide-react';
 import { NAV_ITEMS, COLORS } from '../constants';
 import { supabase } from '../src/lib/supabase';
 

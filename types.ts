@@ -56,6 +56,8 @@ export interface Driver {
 export interface ChecklistItemConfig {
   hint?: string;
   scale_type?: 'ns' | 'brr'; // ns: Sim/Não | brr: Bom/Regular/Ruim
+  input_style?: 'smile_5' | 'smile_3' | 'thumbs' | 'default'; // Estilo visual da resposta
+  require_photo_on?: string[]; // Valores que exigem foto obrigatória (ex: ['ruim', 'nao'])
   selection_type?: 'single' | 'multiple';
   selection_options?: string[];
   min?: number;
@@ -93,6 +95,7 @@ export interface ChecklistSettings {
   share_email: boolean;
   geo_fence_start: boolean;
   geo_fence_end: boolean;
+  show_item_timestamps?: boolean; // ⬅️ Novo: Configuração para mostrar horários
 }
 
 /**
@@ -109,8 +112,30 @@ export interface ChecklistTemplate {
   };
   target_vehicle_types: VehicleType[]; // Quais veículos usam este modelo
   assigned_user_ids: string[]; // Quais usuários podem ver este modelo
+  scoring_enabled?: boolean; // ⬅️ Novo: Pontuação ativa?
+  min_score_to_pass?: number; // Nota mínima (0-100)
+
+  // Fluxo de Análise
+  requires_analysis?: boolean;
+  analysis_approvals_count?: number;
+  analysis_first_approver?: string | null;
+  analysis_second_approver?: string | null;
+  analysis_has_timer?: boolean;
+  analysis_timer_minutes?: number | null;
+
   created_at: string;
   updated_at: string;
+}
+
+export interface ChecklistItemAnswer {
+  value: any;
+  photo_url?: string | null;
+  comment?: string;
+  answered_at?: string; // ⬅️ Novo: Timestamp da resposta
+}
+
+export interface ChecklistAnswers {
+  [itemId: string]: ChecklistItemAnswer;
 }
 
 /**
@@ -125,7 +150,7 @@ export interface ChecklistRecord {
   branch: string;
   status: ChecklistStatus;
   km_at_execution: number;
-  responses: any; // JSONB com as respostas dadas
+  responses: ChecklistAnswers; // ⬅️ Tipagem forte
   critical_issues: string[]; // Itens que reprovaram
   location_start?: { lat: number; lng: number };
   location_end?: { lat: number; lng: number };

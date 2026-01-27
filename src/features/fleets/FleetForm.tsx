@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import PlateInput from '../../components/common/PlateInput';
 
 interface VehicleType {
     id: string;
@@ -20,9 +21,10 @@ interface FleetFormProps {
         color: string;
     };
     onChange: (field: string, value: any) => void;
+    onValidityChange?: (isValid: boolean) => void;
 }
 
-const FleetForm: React.FC<FleetFormProps> = ({ data, onChange }) => {
+const FleetForm: React.FC<FleetFormProps> = ({ data, onChange, onValidityChange }) => {
     const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
     const [loadingTypes, setLoadingTypes] = useState(false);
 
@@ -59,20 +61,12 @@ const FleetForm: React.FC<FleetFormProps> = ({ data, onChange }) => {
                     </div>
 
                     <div className="col-span-12 md:col-span-4">
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
-                            Placa *
-                        </label>
-                        <input
-                            type="text"
+                        <PlateInput
                             value={data.plate}
-                            onChange={(e) => onChange('plate', e.target.value.toUpperCase())}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700 focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all placeholder:text-slate-400"
-                            placeholder="ABC-1234"
-                            maxLength={8}
+                            onChange={(value) => onChange('plate', value)}
+                            onValidityChange={onValidityChange}
+                            required
                         />
-                        <div className="flex justify-end mt-1">
-                            <span className="text-[10px] text-slate-400 font-medium">{data.plate.length} / 8</span>
-                        </div>
                     </div>
 
                     <div className="col-span-12 md:col-span-4">
@@ -190,3 +184,4 @@ const FleetForm: React.FC<FleetFormProps> = ({ data, onChange }) => {
 };
 
 export default FleetForm;
+

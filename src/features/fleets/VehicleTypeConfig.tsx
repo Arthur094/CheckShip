@@ -5,6 +5,7 @@ import VehicleTypeForm from './VehicleTypeForm';
 import VehicleTypeUnits from './VehicleTypeUnits';
 import VehicleTypeChecklists from './VehicleTypeChecklists';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 interface VehicleTypeConfigProps {
     onBack: () => void;
@@ -12,6 +13,8 @@ interface VehicleTypeConfigProps {
 }
 
 const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialData }) => {
+    const { user } = useAuth();
+    const [companyId, setCompanyId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -32,6 +35,19 @@ const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialDa
         }
     }, [initialData]);
 
+    useEffect(() => {
+        if (user) {
+            supabase
+                .from('profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single()
+                .then(({ data }) => {
+                    if (data) setCompanyId(data.company_id);
+                });
+        }
+    }, [user]);
+
     const handleFieldChange = (field: string, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
@@ -48,7 +64,8 @@ const VehicleTypeConfig: React.FC<VehicleTypeConfigProps> = ({ onBack, initialDa
             const payload = {
                 id: formData.id || undefined,
                 name: formData.name,
-                description: formData.description
+                description: formData.description,
+                company_id: companyId
             };
 
             const { data, error } = await supabase
