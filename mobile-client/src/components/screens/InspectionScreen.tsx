@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { localStorageService } from '../../services/localStorageService';
 import { cacheService } from '../../services/cacheService';
 import { ThumbsUp, ThumbsDown, Smile, Meh, Frown, Camera } from 'lucide-react';
-import SignaturePad from '../../common/SignaturePad';
+import SignaturePad from '../common/SignaturePad';
 
 const InspectionScreen: React.FC = () => {
   const { vehicleId, templateId } = useParams();
