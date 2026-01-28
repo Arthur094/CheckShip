@@ -72,7 +72,7 @@ export const cacheService = {
                     return templateAssignments || [];
                 })(),
 
-                // 3. All templates for the user's vehicle types
+                // 3. All templates for the user's vehicle types (LATEST PUBLISHED)
                 (async () => {
                     const { data: vehicleAssignments } = await supabase
                         .from('vehicle_assignments')
@@ -90,27 +90,34 @@ export const cacheService = {
 
                     if (vehicleTypeIds.length === 0) return [];
 
+                    // Get assigned IDs
                     const { data: templateAssignments } = await supabase
                         .from('vehicle_type_checklist_assignments')
-                        .select(`
-                            checklist_template_id,
-                            checklist_templates (*)
-                        `)
+                        .select('checklist_template_id')
                         .in('vehicle_type_id', vehicleTypeIds);
 
-                    if (!templateAssignments) return [];
+                    if (!templateAssignments || templateAssignments.length === 0) return [];
 
-                    // Remove duplicates
-                    const uniqueTemplates = Array.from(
-                        new Map(
-                            templateAssignments
-                                .map((item: any) => item.checklist_templates)
-                                .filter((t: any) => t != null)
-                                .map((t: any) => [t.id, t])
-                        ).values()
-                    );
+                    const assignedIds = templateAssignments.map((t: any) => t.checklist_template_id).filter(Boolean);
 
-                    return uniqueTemplates;
+                    // Get Groups
+                    const { data: groupData } = await supabase
+                        .from('checklist_templates')
+                        .select('group_id')
+                        .in('id', assignedIds);
+
+                    if (!groupData || groupData.length === 0) return [];
+
+                    const groupIds = [...new Set(groupData.map((g: any) => g.group_id).filter(Boolean))];
+
+                    // Get Latest Published Templates
+                    const { data: templates } = await supabase
+                        .from('checklist_templates')
+                        .select('*')
+                        .in('group_id', groupIds)
+                        .eq('status', 'published');
+
+                    return templates || [];
                 })(),
 
                 // 4. Completed inspections (last 30)
