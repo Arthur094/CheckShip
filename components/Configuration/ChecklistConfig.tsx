@@ -357,7 +357,7 @@ const ChecklistConfig: React.FC = () => {
     setOpenPanels(prev => ({ ...prev, [panel]: !prev[panel] }));
   };
 
-  const tabs = ['DADOS CADASTRAIS', 'ESTRUTURA', 'TIPOS DE VEÍCULOS', 'USUÁRIOS'];
+  const tabs = ['DADOS CADASTRAIS', 'ESTRUTURA', 'TIPOS DE OPERAÇÃO', 'USUÁRIOS'];
 
   const addArea = () => {
     if (newAreaName.trim()) {

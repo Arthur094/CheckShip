@@ -8,6 +8,12 @@ interface VehicleType {
     name: string;
 }
 
+interface VehicleConfiguration {
+    id: string;
+    name: string;
+    plates_count: number;
+}
+
 interface FleetFormProps {
     data: {
         plate: string;
@@ -16,6 +22,7 @@ interface FleetFormProps {
         renavam: string;
         crlv_expiry: string;
         vehicle_type_id: string;
+        vehicle_configuration_id?: string;
         brand: string;
         year: string;
         color: string;
@@ -26,21 +33,33 @@ interface FleetFormProps {
 
 const FleetForm: React.FC<FleetFormProps> = ({ data, onChange, onValidityChange }) => {
     const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
+    const [vehicleConfigs, setVehicleConfigs] = useState<VehicleConfiguration[]>([]);
     const [loadingTypes, setLoadingTypes] = useState(false);
 
     useEffect(() => {
         const fetchTypes = async () => {
             try {
                 setLoadingTypes(true);
-                const { data: types, error } = await supabase
+                // Fetch Operation Types
+                const { data: types, error: typesError } = await supabase
                     .from('vehicle_types')
                     .select('id, name')
                     .order('name');
 
-                if (error) throw error;
+                if (typesError) throw typesError;
                 setVehicleTypes(types || []);
+
+                // Fetch Vehicle Configurations
+                const { data: configs, error: configsError } = await supabase
+                    .from('vehicle_configurations')
+                    .select('id, name, plates_count')
+                    .order('name');
+
+                if (configsError) throw configsError;
+                setVehicleConfigs(configs || []);
+
             } catch (error: any) {
-                console.error('Error fetching vehicle types:', error.message);
+                console.error('Error fetching types/configs:', error.message);
             } finally {
                 setLoadingTypes(false);
             }
@@ -71,7 +90,7 @@ const FleetForm: React.FC<FleetFormProps> = ({ data, onChange, onValidityChange 
 
                     <div className="col-span-12 md:col-span-4">
                         <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
-                            Tipo de Veículo *
+                            Tipo de Operação *
                         </label>
                         <select
                             value={data.vehicle_type_id}
@@ -81,6 +100,24 @@ const FleetForm: React.FC<FleetFormProps> = ({ data, onChange, onValidityChange 
                             <option value="">{loadingTypes ? 'Carregando...' : 'Selecione...'}</option>
                             {vehicleTypes.map(type => (
                                 <option key={type.id} value={type.id}>{type.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                            Configuração do Veículo *
+                        </label>
+                        <select
+                            value={data.vehicle_configuration_id || ''}
+                            onChange={(e) => onChange('vehicle_configuration_id', e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700 focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all"
+                        >
+                            <option value="">{loadingTypes ? 'Carregando...' : 'Selecione...'}</option>
+                            {vehicleConfigs.map(config => (
+                                <option key={config.id} value={config.id}>
+                                    {config.name} ({config.plates_count} {config.plates_count === 1 ? 'placa extra' : 'placas extras'})
+                                </option>
                             ))}
                         </select>
                     </div>

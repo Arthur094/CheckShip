@@ -6,7 +6,7 @@ import MultiSelectDropdown from '../../components/common/MultiSelectDropdown';
 
 interface FleetUsersProps {
     vehicleId: string | null;
-    onEnsureExists: () => Promise<boolean>;
+    onEnsureExists: () => Promise<string | null>;
 }
 
 interface User {
@@ -110,7 +110,10 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
             setAllVehicles((vData || []).map(v => ({ id: v.id, label: v.plate })));
 
             // Checklists
-            const { data: cData } = await supabase.from('checklist_templates').select('id, name');
+            const { data: cData } = await supabase
+                .from('checklist_templates')
+                .select('id, name')
+                .eq('status', 'published');
             setAllChecklists((cData || []).map(c => ({ id: c.id, label: c.name })));
 
             // Fetch Mappings
@@ -153,11 +156,10 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
     };
 
     const handleToggleLink = async (profileId: string, isLinked: boolean) => {
-        if (!vehicleId) {
-            const saved = await onEnsureExists();
-            if (!saved) return;
-            // Wait for parent update or just return (UX decision)
-            return;
+        let currentVehicleId = vehicleId;
+        if (!currentVehicleId) {
+            currentVehicleId = await onEnsureExists();
+            if (!currentVehicleId) return;
         }
 
         try {
@@ -166,7 +168,7 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
                 const { error } = await supabase
                     .from('vehicle_assignments')
                     .delete()
-                    .match({ vehicle_id: vehicleId, profile_id: profileId });
+                    .match({ vehicle_id: currentVehicleId, profile_id: profileId });
                 if (error) throw error;
                 const newSet = new Set(assignments);
                 newSet.delete(profileId);
@@ -175,7 +177,7 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
                 // Add
                 const { error } = await supabase
                     .from('vehicle_assignments')
-                    .insert({ vehicle_id: vehicleId, profile_id: profileId });
+                    .insert({ vehicle_id: currentVehicleId, profile_id: profileId });
                 if (error) throw error;
                 const newSet = new Set(assignments);
                 newSet.add(profileId);
@@ -223,10 +225,10 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
     }, [users, searchTerm, filters, userVehicleTypes, userVehicles, userChecklists, assignments]);
 
     const handleSelectAll = async () => {
-        if (!vehicleId) {
-            const success = await onEnsureExists();
-            if (!success) return;
-            return;
+        let currentVehicleId = vehicleId;
+        if (!currentVehicleId) {
+            currentVehicleId = await onEnsureExists();
+            if (!currentVehicleId) return;
         }
 
         if (!confirm(`Deseja vincular TODOS os ${filteredUsers.length} usuários listados a este veículo?`)) return;
@@ -235,7 +237,7 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
             setLoading(true);
             const toAdd = filteredUsers
                 .filter(u => !assignments.has(u.id))
-                .map(u => ({ vehicle_id: vehicleId, profile_id: u.id }));
+                .map(u => ({ vehicle_id: currentVehicleId, profile_id: u.id }));
 
             if (toAdd.length > 0) {
                 const { error } = await supabase.from('vehicle_assignments').upsert(toAdd, { onConflict: 'vehicle_id, profile_id', ignoreDuplicates: true });
@@ -295,7 +297,7 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
                             onToggle={() => handleFilterToggle('userTypes')}
                         />
                         <MultiSelectDropdown
-                            title="Tipos de Veículo" // That they are already assigned to
+                            title="Tipos de Operação" // That they are already assigned to
                             options={allVehicleTypes}
                             selected={filters.vehicleTypes}
                             onChange={(s) => setFilters(prev => ({ ...prev, vehicleTypes: s }))}
@@ -353,7 +355,7 @@ const FleetUsers: React.FC<FleetUsersProps> = ({ vehicleId, onEnsureExists }) =>
                         if (list.length === 0) return null;
                         let label = key;
                         if (key === 'userTypes') label = 'Tipo Usuário';
-                        if (key === 'vehicleTypes') label = 'Tipo Veículo';
+                        if (key === 'vehicleTypes') label = 'Tipo Operação';
                         if (key === 'vehicles') label = 'Veículo';
                         if (key === 'checklists') label = 'Checklist';
                         if (key === 'active') label = 'Ativo';

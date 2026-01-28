@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 
 interface FleetChecklistsProps {
     vehicleId: string | null;
-    onEnsureExists: () => Promise<boolean>;
+    onEnsureExists: () => Promise<string | null>;
 }
 
 const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureExists }) => {
@@ -15,11 +15,6 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
-        if (!vehicleId) {
-            setLoading(false);
-            return;
-        }
-
         try {
             setLoading(true);
 
@@ -27,20 +22,24 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
             const { data: templatesData, error: templatesError } = await supabase
                 .from('checklist_templates')
                 .select('id, name')
+                .eq('status', 'published')
                 .order('name');
 
             if (templatesError) throw templatesError;
-
-            // 2. Fetch current assignments for this vehicle
-            const { data: assignmentsData, error: assignmentsError } = await supabase
-                .from('vehicle_checklist_assignments')
-                .select('checklist_template_id')
-                .eq('vehicle_id', vehicleId);
-
-            if (assignmentsError) throw assignmentsError;
-
             setTemplates(templatesData || []);
-            setAssignments(new Set((assignmentsData || []).map(a => a.checklist_template_id)));
+
+            // 2. Fetch current assignments for this vehicle (if it exists)
+            if (vehicleId) {
+                const { data: assignmentsData, error: assignmentsError } = await supabase
+                    .from('vehicle_checklist_assignments')
+                    .select('checklist_template_id')
+                    .eq('vehicle_id', vehicleId);
+
+                if (assignmentsError) throw assignmentsError;
+                setAssignments(new Set((assignmentsData || []).map(a => a.checklist_template_id)));
+            } else {
+                setAssignments(new Set());
+            }
         } catch (error: any) {
             console.error('Error fetching checklists/assignments:', error.message);
         } finally {
@@ -53,11 +52,11 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
     }, [vehicleId]);
 
     const handleToggleLink = async (templateId: string, isLinked: boolean) => {
-        if (!vehicleId) return;
-
-        // Ensure vehicle exists in DB before linking
-        const exists = await onEnsureExists();
-        if (!exists) return;
+        let currentVehicleId = vehicleId;
+        if (!currentVehicleId) {
+            currentVehicleId = await onEnsureExists();
+            if (!currentVehicleId) return;
+        }
 
         try {
             if (isLinked) {
@@ -65,7 +64,7 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
                 const { error } = await supabase
                     .from('vehicle_checklist_assignments')
                     .delete()
-                    .match({ vehicle_id: vehicleId, checklist_template_id: templateId });
+                    .match({ vehicle_id: currentVehicleId, checklist_template_id: templateId });
 
                 if (error) throw error;
 
@@ -76,7 +75,7 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
                 // Add assignment
                 const { error } = await supabase
                     .from('vehicle_checklist_assignments')
-                    .insert({ vehicle_id: vehicleId, checklist_template_id: templateId });
+                    .insert({ vehicle_id: currentVehicleId, checklist_template_id: templateId });
 
                 if (error) throw error;
 
@@ -91,11 +90,13 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
     };
 
     const handleBulkToggle = async () => {
-        if (!vehicleId || filteredTemplates.length === 0) return;
+        if (filteredTemplates.length === 0) return;
 
-        // Ensure vehicle exists in DB
-        const exists = await onEnsureExists();
-        if (!exists) return;
+        let currentVehicleId = vehicleId;
+        if (!currentVehicleId) {
+            currentVehicleId = await onEnsureExists();
+            if (!currentVehicleId) return;
+        }
 
         // Determine target state
         const allLinked = filteredTemplates.every(t => assignments.has(t.id));
@@ -107,7 +108,7 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
                 const toAdd = filteredTemplates
                     .filter(t => !assignments.has(t.id))
                     .map(t => ({
-                        vehicle_id: vehicleId,
+                        vehicle_id: currentVehicleId,
                         checklist_template_id: t.id
                     }));
 
@@ -130,7 +131,7 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
                 const { error } = await supabase
                     .from('vehicle_checklist_assignments')
                     .delete()
-                    .eq('vehicle_id', vehicleId)
+                    .eq('vehicle_id', currentVehicleId)
                     .in('checklist_template_id', idsToRemove);
 
                 if (error) throw error;
@@ -157,14 +158,6 @@ const FleetChecklists: React.FC<FleetChecklistsProps> = ({ vehicleId, onEnsureEx
             <div className="p-12 text-center text-slate-400">
                 <div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full mb-2"></div>
                 <p className="text-sm">Carregando checklists...</p>
-            </div>
-        );
-    }
-
-    if (!vehicleId) {
-        return (
-            <div className="p-12 text-center text-slate-400 italic">
-                Salve os dados básicos do veículo primeiro para habilitar o vínculo de checklists.
             </div>
         );
     }

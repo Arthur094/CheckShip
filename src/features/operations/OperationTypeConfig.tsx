@@ -1,0 +1,183 @@
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import OperationTypeForm from './OperationTypeForm';
+import OperationTypeUnits from './OperationTypeUnits';
+import OperationTypeChecklists from './OperationTypeChecklists';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
+
+interface OperationTypeConfigProps {
+    onBack: () => void;
+    onSave?: () => void;
+    initialData?: any;
+}
+
+const OperationTypeConfig: React.FC<OperationTypeConfigProps> = ({ onBack, onSave, initialData }) => {
+    const { user } = useAuth();
+    const [companyId, setCompanyId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState('profile');
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        id: initialData?.id || null,
+        name: initialData?.name || '',
+        description: initialData?.description || ''
+    });
+
+    const isNew = !formData.id;
+
+    useEffect(() => {
+        if (initialData) {
+            setFormData({
+                id: initialData.id,
+                name: initialData.name || '',
+                description: initialData.description || ''
+            });
+        }
+    }, [initialData]);
+
+    useEffect(() => {
+        if (user) {
+            supabase
+                .from('profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single()
+                .then(({ data }) => {
+                    if (data) setCompanyId(data.company_id);
+                });
+        }
+    }, [user]);
+
+    const handleFieldChange = (field: string, value: string) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const performSave = async (silent = false): Promise<boolean> => {
+        if (!formData.name.trim()) {
+            if (!silent) alert('O nome do tipo de operação é obrigatório.');
+            return false;
+        }
+
+        try {
+            if (!silent) setLoading(true);
+
+            const payload = {
+                id: formData.id || undefined,
+                name: formData.name,
+                description: formData.description,
+                company_id: companyId
+            };
+
+            const { data, error } = await supabase
+                .from('vehicle_types') // Mantém tabela antiga
+                .upsert(payload)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                setFormData(prev => ({ ...prev, id: data.id }));
+            }
+
+            if (!silent) {
+                alert('Tipo de operação salvo com sucesso!');
+                if (isNew) {
+                    onBack();
+                } else if (onSave) {
+                    onSave();
+                }
+            }
+            return true;
+        } catch (error: any) {
+            console.error('Error saving operation type:', error.message);
+            if (!silent) alert('Erro ao salvar: ' + error.message);
+            return false;
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    };
+
+    const handleSave = () => performSave(false);
+
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'profile':
+                return <OperationTypeForm data={formData} onChange={handleFieldChange} />;
+            case 'units':
+                return <OperationTypeUnits vehicleTypeId={formData.id} onEnsureExists={() => performSave(true)} />;
+            case 'checklists':
+                return <OperationTypeChecklists vehicleTypeId={formData.id} onEnsureExists={() => performSave(true)} />;
+            default:
+                return <OperationTypeForm data={formData} onChange={handleFieldChange} />;
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50">
+            {/* Header */}
+            <div className="bg-white border-b border-slate-200">
+                <div className="px-8 py-5">
+                    <div className="flex items-center gap-4 mb-1">
+                        <button onClick={onBack} className="text-slate-400 hover:text-slate-600 transition-colors">
+                            <ArrowLeft size={24} />
+                        </button>
+                        <h1 className="text-xl font-bold text-blue-900">
+                            {isNew ? 'Novo Tipo de Operação' : formData.name}
+                        </h1>
+                    </div>
+                    <div className="text-xs text-slate-400 ml-10">
+                        Configurações / {isNew ? 'Criar Tipo de Operação' : 'Configurar Tipo de Operação'}
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex px-8 gap-8">
+                    <button
+                        onClick={() => setActiveTab('profile')}
+                        className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'profile' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Dados Cadastrais
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('units')}
+                        className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'units' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Veículos da Operação
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('checklists')}
+                        className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'checklists' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Checklists
+                    </button>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+                {renderContent()}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-white border-t border-slate-200 px-8 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-slate-700">Ativo</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" defaultChecked={true} />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                </div>
+                <button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="bg-blue-900 text-white px-8 py-2.5 rounded text-sm font-bold shadow-sm hover:bg-blue-800 transition-colors disabled:opacity-50"
+                >
+                    {loading ? 'SALVANDO...' : 'SALVAR'}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+export default OperationTypeConfig;

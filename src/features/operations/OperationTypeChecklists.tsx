@@ -1,32 +1,20 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-interface ChecklistVehicleTypesProps {
-    checklistId: string | null;
-    onEnsureExists: () => Promise<string | null>; // Now returns the actual ID after save
+interface OperationTypeChecklistsProps {
+    vehicleTypeId: string | null;
+    onEnsureExists: () => Promise<boolean>;
 }
 
-const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklistId, onEnsureExists }) => {
+const OperationTypeChecklists: React.FC<OperationTypeChecklistsProps> = ({ vehicleTypeId, onEnsureExists }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
+    const [templates, setTemplates] = useState<any[]>([]);
     const [assignments, setAssignments] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
-    const [activeChecklistId, setActiveChecklistId] = useState<string | null>(checklistId); // Track real ID
 
     const fetchData = async () => {
-        console.log('[ChecklistVehicleTypes] fetchData called with checklistId:', checklistId);
-
-        if (!checklistId) {
-            console.log('[ChecklistVehicleTypes] No checklistId, fetching only vehicle types');
-            // Fetch only types, assignments will be empty
-            const { data, error } = await supabase
-                .from('vehicle_types')
-                .select('id, name')
-                .order('name');
-
-            if (!error) setVehicleTypes(data || []);
+        if (!vehicleTypeId) {
             setLoading(false);
             return;
         }
@@ -34,75 +22,64 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
         try {
             setLoading(true);
 
-            // 1. Fetch all vehicle types
-            const { data: typesData, error: typesError } = await supabase
-                .from('vehicle_types')
+            const { data: templatesData, error: templatesError } = await supabase
+                .from('checklist_templates')
                 .select('id, name')
+                .eq('status', 'published')
                 .order('name');
 
-            if (typesError) throw typesError;
+            if (templatesError) throw templatesError;
 
-            // 2. Fetch current vehicle types assigned this checklist
-            console.log('[ChecklistVehicleTypes] Fetching assignments for checklistId:', checklistId);
             const { data: assignmentsData, error: assignmentsError } = await supabase
                 .from('vehicle_type_checklist_assignments')
-                .select('vehicle_type_id')
-                .eq('checklist_template_id', checklistId);
+                .select('checklist_template_id')
+                .eq('vehicle_type_id', vehicleTypeId);
 
             if (assignmentsError) throw assignmentsError;
 
-            console.log('[ChecklistVehicleTypes] Assignments loaded:', assignmentsData?.length || 0, assignmentsData);
-
-            setVehicleTypes(typesData || []);
-            setAssignments(new Set((assignmentsData || []).map(a => a.vehicle_type_id)));
+            setTemplates(templatesData || []);
+            setAssignments(new Set((assignmentsData || []).map(a => a.checklist_template_id)));
         } catch (error: any) {
-            console.error('Error fetching data:', error.message);
+            console.error('Error fetching checklists/assignments:', error.message);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        console.log('[ChecklistVehicleTypes] useEffect triggered, checklistId:', checklistId);
         fetchData();
-    }, [checklistId]);
+    }, [vehicleTypeId]);
 
-    const handleToggleLink = async (typeId: string, isLinked: boolean) => {
-        const realId = await onEnsureExists();
-        console.log('[ChecklistVehicleTypes] handleToggleLink - realId from onEnsureExists:', realId);
-        if (!realId) return;
+    const handleToggleLink = async (templateId: string, isLinked: boolean) => {
+        if (!vehicleTypeId) return;
 
-        // Update active ID if we got a new one
-        if (realId !== activeChecklistId) {
-            setActiveChecklistId(realId);
-        }
+        const exists = await onEnsureExists();
+        if (!exists) return;
 
         try {
             if (isLinked) {
-                // Remove assignment
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
                     .delete()
-                    .match({ checklist_template_id: realId, vehicle_type_id: typeId });
+                    .match({ vehicle_type_id: vehicleTypeId, checklist_template_id: templateId });
 
                 if (error) throw error;
 
                 const newAssignments = new Set(assignments);
-                newAssignments.delete(typeId);
+                newAssignments.delete(templateId);
                 setAssignments(newAssignments);
             } else {
-                // Add assignment - use upsert to avoid duplicate key errors
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
                     .upsert(
-                        { checklist_template_id: realId, vehicle_type_id: typeId },
+                        { vehicle_type_id: vehicleTypeId, checklist_template_id: templateId },
                         { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true }
                     );
 
                 if (error) throw error;
 
                 const newAssignments = new Set(assignments);
-                newAssignments.add(typeId);
+                newAssignments.add(templateId);
                 setAssignments(newAssignments);
             }
         } catch (error: any) {
@@ -111,67 +88,52 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
         }
     };
 
+    const filteredTemplates = templates.filter(t =>
+        t.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     const handleBulkToggle = async () => {
-        console.log('[ChecklistVehicleTypes] handleBulkToggle called');
-        console.log('[ChecklistVehicleTypes] checklistId at bulk toggle:', checklistId);
+        if (!vehicleTypeId || filteredTemplates.length === 0) return;
 
-        const realId = await onEnsureExists();
-        console.log('[ChecklistVehicleTypes] onEnsureExists returned realId:', realId);
+        const exists = await onEnsureExists();
+        if (!exists) return;
 
-        if (!realId || filteredTypes.length === 0) {
-            console.log('[ChecklistVehicleTypes] Early return - realId:', realId, 'filteredTypes.length:', filteredTypes.length);
-            return;
-        }
-
-        // Update active ID if we got a new one
-        if (realId !== activeChecklistId) {
-            setActiveChecklistId(realId);
-        }
-
-        const allLinked = filteredTypes.every(t => assignments.has(t.id));
+        const allLinked = filteredTemplates.every(t => assignments.has(t.id));
         const targetState = !allLinked;
-        console.log('[ChecklistVehicleTypes] allLinked:', allLinked, 'targetState:', targetState);
 
         try {
             if (targetState) {
-                // Link all
-                const toAdd = filteredTypes
+                const toAdd = filteredTemplates
                     .filter(t => !assignments.has(t.id))
                     .map(t => ({
-                        checklist_template_id: realId, // Use real ID here!
-                        vehicle_type_id: t.id
+                        vehicle_type_id: vehicleTypeId,
+                        checklist_template_id: t.id
                     }));
 
-                console.log('[ChecklistVehicleTypes] toAdd with realId:', toAdd);
-
                 if (toAdd.length > 0) {
-                    const { data, error } = await supabase
+                    const { error } = await supabase
                         .from('vehicle_type_checklist_assignments')
-                        .upsert(toAdd, { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true })
-                        .select();
-
-                    console.log('[ChecklistVehicleTypes] upsert response - data:', data, 'error:', error);
+                        .upsert(toAdd, { onConflict: 'vehicle_type_id, checklist_template_id', ignoreDuplicates: true });
 
                     if (error) throw error;
                 }
 
                 const newAssignments = new Set(assignments);
-                filteredTypes.forEach(t => newAssignments.add(t.id));
+                filteredTemplates.forEach(t => newAssignments.add(t.id));
                 setAssignments(newAssignments);
 
             } else {
-                // Unlink all
-                const idsToRemove = filteredTypes.map(t => t.id);
+                const idsToRemove = filteredTemplates.map(t => t.id);
                 const { error } = await supabase
                     .from('vehicle_type_checklist_assignments')
                     .delete()
-                    .eq('checklist_template_id', realId) // Use real ID here!
-                    .in('vehicle_type_id', idsToRemove);
+                    .eq('vehicle_type_id', vehicleTypeId)
+                    .in('checklist_template_id', idsToRemove);
 
                 if (error) throw error;
 
                 const newAssignments = new Set(assignments);
-                filteredTypes.forEach(t => newAssignments.delete(t.id));
+                filteredTemplates.forEach(t => newAssignments.delete(t.id));
                 setAssignments(newAssignments);
             }
 
@@ -183,15 +145,19 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
         }
     };
 
-    const filteredTypes = vehicleTypes.filter(t =>
-        t.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
     if (loading) {
         return (
             <div className="p-12 text-center text-slate-400">
                 <div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full mb-2"></div>
-                <p className="text-sm">Carregando tipos de operação...</p>
+                <p className="text-sm">Carregando checklists...</p>
+            </div>
+        );
+    }
+
+    if (!vehicleTypeId) {
+        return (
+            <div className="p-12 text-center text-slate-400 italic">
+                Salve o tipo de operação primeiro para vincular checklists.
             </div>
         );
     }
@@ -203,7 +169,7 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                     <Search size={20} className="absolute left-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar tipo de operação"
+                        placeholder="Buscar checklist"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-4 py-3 bg-transparent outline-none text-sm text-slate-700 placeholder:text-slate-400"
@@ -211,10 +177,10 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                 </div>
             </div>
 
-            <div className="flex-1 px-8 pb-8">
+            <div className="flex-1 overflow-y-auto px-8 pb-8">
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                        <div className="col-span-10">Tipo de Operação</div>
+                        <div className="col-span-10">Checklist</div>
                         <div className="col-span-2 text-right group flex items-center justify-end gap-2 cursor-pointer" onClick={handleBulkToggle}>
                             <span className="group-hover:hidden">Vincular</span>
                             <span className="hidden group-hover:block text-blue-600 font-extrabold text-[10px] tracking-wide bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shadow-sm transition-all">MARCAR TODOS</span>
@@ -222,17 +188,17 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                     </div>
 
                     <div className="divide-y divide-slate-100">
-                        {filteredTypes.length === 0 ? (
+                        {filteredTemplates.length === 0 ? (
                             <div className="p-8 text-center text-slate-400 text-sm">
-                                Nenhum tipo encontrado.
+                                Nenhum checklist encontrado.
                             </div>
                         ) : (
-                            filteredTypes.map((type) => {
-                                const isLinked = assignments.has(type.id);
+                            filteredTemplates.map((template) => {
+                                const isLinked = assignments.has(template.id);
                                 return (
-                                    <div key={type.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors">
+                                    <div key={template.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors">
                                         <div className="col-span-10 text-sm text-slate-700 font-medium">
-                                            {type.name}
+                                            {template.name}
                                         </div>
                                         <div className="col-span-2 flex justify-end">
                                             <label className="relative inline-flex items-center cursor-pointer">
@@ -240,7 +206,7 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
                                                     type="checkbox"
                                                     className="sr-only peer"
                                                     checked={isLinked}
-                                                    onChange={() => handleToggleLink(type.id, isLinked)}
+                                                    onChange={() => handleToggleLink(template.id, isLinked)}
                                                 />
                                                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                                             </label>
@@ -256,4 +222,4 @@ const ChecklistVehicleTypes: React.FC<ChecklistVehicleTypesProps> = ({ checklist
     );
 };
 
-export default ChecklistVehicleTypes;
+export default OperationTypeChecklists;

@@ -6,7 +6,7 @@ import MultiSelectDropdown from '../../components/common/MultiSelectDropdown';
 
 interface UserVehiclesProps {
     profileId: string | null;
-    onEnsureExists: () => Promise<boolean>;
+    onEnsureExists: () => Promise<string | null>;
 }
 
 interface VehicleType {
@@ -36,11 +36,6 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
     });
 
     const fetchData = async () => {
-        if (!profileId) {
-            setLoading(false);
-            return;
-        }
-
         try {
             setLoading(true);
 
@@ -60,17 +55,21 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
 
             if (typesError) throw typesError;
 
-            // 3. Fetch current assignments for this profile
-            const { data: assignmentsData, error: assignmentsError } = await supabase
-                .from('vehicle_assignments')
-                .select('vehicle_id')
-                .eq('profile_id', profileId);
-
-            if (assignmentsError) throw assignmentsError;
-
             setVehicles(vehiclesData || []);
             setVehicleTypes(typesData || []);
-            setAssignments(new Set((assignmentsData || []).map(a => a.vehicle_id)));
+
+            // 3. Fetch current assignments for this profile (if it exists)
+            if (profileId) {
+                const { data: assignmentsData, error: assignmentsError } = await supabase
+                    .from('vehicle_assignments')
+                    .select('vehicle_id')
+                    .eq('profile_id', profileId);
+
+                if (assignmentsError) throw assignmentsError;
+                setAssignments(new Set((assignmentsData || []).map(a => a.vehicle_id)));
+            } else {
+                setAssignments(new Set());
+            }
         } catch (error: any) {
             console.error('Error fetching vehicles/assignments:', error.message);
         } finally {
@@ -83,11 +82,11 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
     }, [profileId]);
 
     const handleToggleLink = async (vehicleId: string, isLinked: boolean) => {
-        if (!profileId) return;
-
-        // Ensure profile exists in DB before linking to avoid FK error
-        const exists = await onEnsureExists();
-        if (!exists) return;
+        let currentProfileId = profileId;
+        if (!currentProfileId) {
+            currentProfileId = await onEnsureExists();
+            if (!currentProfileId) return;
+        }
 
         try {
             if (isLinked) {
@@ -95,7 +94,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 const { error } = await supabase
                     .from('vehicle_assignments')
                     .delete()
-                    .match({ vehicle_id: vehicleId, profile_id: profileId });
+                    .match({ vehicle_id: vehicleId, profile_id: currentProfileId });
 
                 if (error) throw error;
 
@@ -106,7 +105,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 // Add assignment
                 const { error } = await supabase
                     .from('vehicle_assignments')
-                    .insert({ vehicle_id: vehicleId, profile_id: profileId });
+                    .insert({ vehicle_id: vehicleId, profile_id: currentProfileId });
 
                 if (error) throw error;
 
@@ -147,11 +146,13 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
     }, [vehicles, searchTerm, filters, assignments]);
 
     const handleBulkToggle = async () => {
-        if (!profileId || filteredVehicles.length === 0) return;
+        if (filteredVehicles.length === 0) return;
 
-        // Ensure profile exists in DB
-        const exists = await onEnsureExists();
-        if (!exists) return;
+        let currentProfileId = profileId;
+        if (!currentProfileId) {
+            currentProfileId = await onEnsureExists();
+            if (!currentProfileId) return;
+        }
 
         // Determine target state
         const allLinked = filteredVehicles.every(v => assignments.has(v.id));
@@ -164,7 +165,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                     .filter(v => !assignments.has(v.id))
                     .map(v => ({
                         vehicle_id: v.id,
-                        profile_id: profileId
+                        profile_id: currentProfileId
                     }));
 
                 if (toAdd.length > 0) {
@@ -187,7 +188,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 const { error } = await supabase
                     .from('vehicle_assignments')
                     .delete()
-                    .eq('profile_id', profileId)
+                    .eq('profile_id', currentProfileId)
                     .in('vehicle_id', idsToRemove);
 
                 if (error) throw error;
@@ -241,14 +242,6 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
         );
     }
 
-    if (!profileId) {
-        return (
-            <div className="p-12 text-center text-slate-400 italic">
-                Crie o usuário primeiro para vincular veículos.
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col h-full bg-slate-50">
             {/* Search Bar */}
@@ -277,7 +270,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                     <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-6">
                         <div className="grid grid-cols-3 gap-4 mb-4">
                             <MultiSelectDropdown
-                                title="Tipo de Veículo"
+                                title="Tipo de Operação"
                                 options={vehicleTypeOptions}
                                 selected={filters.vehicleTypes}
                                 onChange={(selected) => setFilters({ ...filters, vehicleTypes: selected })}
@@ -363,7 +356,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
                         <div className="col-span-2">Placa</div>
-                        <div className="col-span-8">Tipo de Veículo</div>
+                        <div className="col-span-8">Tipo de Operação</div>
                         <div className="col-span-2 text-right group flex items-center justify-end gap-2 cursor-pointer" onClick={handleBulkToggle}>
                             <span className="group-hover:hidden">Vincular</span>
                             <span className="hidden group-hover:block text-blue-600 font-extrabold text-[10px] tracking-wide bg-blue-50 px-2 py-0.5 rounded border border-blue-200 shadow-sm transition-all">MARCAR TODOS</span>

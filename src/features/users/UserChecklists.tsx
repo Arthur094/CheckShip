@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 
 interface UserChecklistsProps {
     profileId: string | null;
-    onEnsureExists: () => Promise<boolean>;
+    onEnsureExists: () => Promise<string | null>;
 }
 
 interface ChecklistPermission {
@@ -22,11 +22,6 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
-        if (!profileId) {
-            setLoading(false);
-            return;
-        }
-
         try {
             setLoading(true);
 
@@ -34,30 +29,34 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
             const { data: templatesData, error: templatesError } = await supabase
                 .from('checklist_templates')
                 .select('id, name')
+                .eq('status', 'published')
                 .order('name');
 
             if (templatesError) throw templatesError;
-
-            // 2. Fetch current permissions for this profile
-            const { data: permissionsData, error: permissionsError } = await supabase
-                .from('profile_checklist_permissions')
-                .select('*')
-                .eq('profile_id', profileId);
-
-            if (permissionsError) throw permissionsError;
-
-            const permissionsMap: Record<string, ChecklistPermission> = {};
-            (permissionsData || []).forEach(p => {
-                permissionsMap[p.checklist_template_id] = {
-                    checklist_template_id: p.checklist_template_id,
-                    can_apply: p.can_apply,
-                    view_report: p.view_report,
-                    receive_email: p.receive_email
-                };
-            });
-
             setTemplates(templatesData || []);
-            setPermissions(permissionsMap);
+
+            // 2. Fetch current permissions for this profile (if it exists)
+            if (profileId) {
+                const { data: permissionsData, error: permissionsError } = await supabase
+                    .from('profile_checklist_permissions')
+                    .select('*')
+                    .eq('profile_id', profileId);
+
+                if (permissionsError) throw permissionsError;
+
+                const permissionsMap: Record<string, ChecklistPermission> = {};
+                (permissionsData || []).forEach(p => {
+                    permissionsMap[p.checklist_template_id] = {
+                        checklist_template_id: p.checklist_template_id,
+                        can_apply: p.can_apply,
+                        view_report: p.view_report,
+                        receive_email: p.receive_email
+                    };
+                });
+                setPermissions(permissionsMap);
+            } else {
+                setPermissions({});
+            }
         } catch (error: any) {
             console.error('Error fetching data:', error.message);
         } finally {
@@ -70,11 +69,11 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
     }, [profileId]);
 
     const handleToggle = async (templateId: string, field: keyof Omit<ChecklistPermission, 'checklist_template_id'>) => {
-        if (!profileId) return;
-
-        // Ensure user exists in DB
-        const exists = await onEnsureExists();
-        if (!exists) return;
+        let currentProfileId = profileId;
+        if (!currentProfileId) {
+            currentProfileId = await onEnsureExists();
+            if (!currentProfileId) return;
+        }
 
         const current = permissions[templateId] || {
             checklist_template_id: templateId,
@@ -96,7 +95,7 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
                 const { error } = await supabase
                     .from('profile_checklist_permissions')
                     .delete()
-                    .match({ profile_id: profileId, checklist_template_id: templateId });
+                    .match({ profile_id: currentProfileId, checklist_template_id: templateId });
 
                 if (error) throw error;
 
@@ -107,7 +106,7 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
                 const { error } = await supabase
                     .from('profile_checklist_permissions')
                     .upsert({
-                        profile_id: profileId,
+                        profile_id: currentProfileId,
                         checklist_template_id: templateId,
                         can_apply: updated.can_apply,
                         view_report: updated.view_report,
@@ -128,11 +127,13 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
     };
 
     const handleBulkToggle = async (field: keyof Omit<ChecklistPermission, 'checklist_template_id'>) => {
-        if (!profileId || filteredTemplates.length === 0) return;
+        if (filteredTemplates.length === 0) return;
 
-        // Ensure user exists in DB
-        const exists = await onEnsureExists();
-        if (!exists) return;
+        let currentProfileId = profileId;
+        if (!currentProfileId) {
+            currentProfileId = await onEnsureExists();
+            if (!currentProfileId) return;
+        }
 
         // Determine target state: if any is false, toggle all to true. If all true, toggle to false.
         const currentStates = filteredTemplates.map(t => {
@@ -153,7 +154,7 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
                 };
 
                 return {
-                    profile_id: profileId,
+                    profile_id: currentProfileId,
                     checklist_template_id: template.id,
                     can_apply: field === 'can_apply' ? targetValue : current.can_apply,
                     view_report: field === 'view_report' ? targetValue : current.view_report,
@@ -167,19 +168,8 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
 
             // Perform batch operations
             if (toDelete.length > 0) {
-                // Delete doesn't support bulk array with composite key cleanly in one statement unless using IN, 
-                // but match is single row. So we'll iterate or use a stored procedure. 
-                // For safety and verified stability, we'll try to delete by ID if we had it, but we only have composite keys.
-                // We will simply upsert them as false/false/false? No, we want to delete.
-                // Let's iterate delete for now, or optimise later. Bulk upsert is safe.
-                // Actually, Supabase delete with 'in' filter is efficient.
-                // But we have pairs.
-                // Workaround: Upsert everything first, then clean up if needed? Or simpler: loop delete for these few.
-
-                // Better approach for UX speed: Upsert ALL as target values. Then run a cleanup query.
-                // Or just iterate the promises.
                 await Promise.all(toDelete.map(u =>
-                    supabase.from('profile_checklist_permissions').delete().match({ profile_id: profileId, checklist_template_id: u.checklist_template_id })
+                    supabase.from('profile_checklist_permissions').delete().match({ profile_id: currentProfileId, checklist_template_id: u.checklist_template_id })
                 ));
             }
 
@@ -222,7 +212,6 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
             alert('Erro ao atualizar em massa: ' + error.message);
         }
     };
-
     const filteredTemplates = templates.filter(t =>
         t.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -232,14 +221,6 @@ const UserChecklists: React.FC<UserChecklistsProps> = ({ profileId, onEnsureExis
             <div className="p-12 text-center text-slate-400">
                 <div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full mb-2"></div>
                 <p className="text-sm">Carregando permissões...</p>
-            </div>
-        );
-    }
-
-    if (!profileId) {
-        return (
-            <div className="p-12 text-center text-slate-400 italic">
-                Salve os dados básicos do usuário primeiro para habilitar o vínculo de checklists.
             </div>
         );
     }

@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import FleetForm from './FleetForm';
 import FleetUsers from './FleetUsers';
 import FleetChecklists from './FleetChecklists';
+import DocumentTab from '../../components/common/DocumentTab';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -26,14 +27,12 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
         renavam: initialData?.renavam || '',
         crlv_expiry: initialData?.crlv_expiry || '',
         vehicle_type_id: initialData?.vehicle_type_id || '',
+        vehicle_configuration_id: initialData?.vehicle_configuration_id || '',
         brand: initialData?.brand || '',
         year: initialData?.year || '',
         color: initialData?.color || '',
         active: initialData?.active !== undefined ? initialData.active : true
     });
-
-    // Ensure we have a UUID even for new vehicles to allow assignments
-    const [idForAssignments] = useState(formData.id || crypto.randomUUID());
 
     const isNew = !formData.id;
 
@@ -47,6 +46,7 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                 renavam: initialData.renavam || '',
                 crlv_expiry: initialData.crlv_expiry || '',
                 vehicle_type_id: initialData.vehicle_type_id || '',
+                vehicle_configuration_id: initialData.vehicle_configuration_id || '',
                 brand: initialData.brand || '',
                 year: initialData.year || '',
                 color: initialData.color || '',
@@ -72,10 +72,10 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    const performSave = async (silent = false) => {
+    const performSave = async (silent = false): Promise<string | null> => {
         if (!formData.plate.trim() || !formData.model.trim()) {
             if (!silent) alert('Placa e Modelo são obrigatórios.');
-            return false;
+            return null;
         }
 
         try {
@@ -84,7 +84,7 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
             // Manual mapping to snake_case for Supabase
             // Handling integer conversion for current_km and year
             const payload = {
-                id: idForAssignments,
+                id: formData.id || crypto.randomUUID(),
                 plate: formData.plate,
                 model: formData.model,
                 current_km: formData.current_km !== undefined && formData.current_km !== null && formData.current_km.toString().trim() !== ""
@@ -93,6 +93,7 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                 renavam: formData.renavam,
                 crlv_expiry: formData.crlv_expiry || null,
                 vehicle_type_id: formData.vehicle_type_id || null,
+                vehicle_configuration_id: formData.vehicle_configuration_id || null,
                 brand: formData.brand,
                 year: formData.year !== undefined && formData.year !== null && formData.year.toString().trim() !== ""
                     ? parseInt(formData.year.toString())
@@ -102,11 +103,18 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                 company_id: companyId
             };
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('vehicles')
-                .upsert(payload);
+                .upsert(payload)
+                .select()
+                .single();
 
             if (error) throw error;
+
+            // Update formData with the saved ID
+            if (data?.id && !formData.id) {
+                setFormData(prev => ({ ...prev, id: data.id }));
+            }
 
             if (!silent) {
                 // If it's a new vehicle, we want a special message and potentially not close the screen
@@ -116,11 +124,11 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                     alert('Veículo salvo com sucesso!');
                 }
             }
-            return true;
+            return data?.id || payload.id;
         } catch (error: any) {
             console.error('Error saving vehicle:', error.message);
             if (!silent) alert('Erro ao salvar: ' + error.message);
-            return false;
+            return null;
         } finally {
             if (!silent) setLoading(false);
         }
@@ -142,9 +150,11 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
             case 'profile':
                 return <FleetForm data={formData} onChange={handleFieldChange} />;
             case 'users':
-                return <FleetUsers vehicleId={idForAssignments} onEnsureExists={() => performSave(true)} />;
+                return <FleetUsers vehicleId={formData.id} onEnsureExists={() => performSave(true)} />;
             case 'checklists':
-                return <FleetChecklists vehicleId={idForAssignments} onEnsureExists={() => performSave(true)} />;
+                return <FleetChecklists vehicleId={formData.id} onEnsureExists={() => performSave(true)} />;
+            case 'documents':
+                return <DocumentTab entityType="vehicle" entityId={formData.id} requiredDocs={['CRLV', 'CIV', 'CCT', 'AET_FEDERAL', 'AET_ESTADUAL']} onEnsureExists={() => performSave(true)} />;
             default:
                 return <FleetForm data={formData} onChange={handleFieldChange} />;
         }
@@ -175,6 +185,12 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                         className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'profile' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         Dados Cadastrais
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('documents')}
+                        className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'documents' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Documentos
                     </button>
                     <button
                         onClick={() => setActiveTab('users')}

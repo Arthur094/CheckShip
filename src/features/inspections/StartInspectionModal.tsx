@@ -15,6 +15,7 @@ interface Vehicle {
     plate: string;
     model: string;
     vehicle_type_id: string;
+    trailer_id?: string | null;
 }
 
 interface ChecklistOption {
@@ -22,6 +23,10 @@ interface ChecklistOption {
     name: string;
     subject: string;
     version?: number;
+    validate_docs?: boolean;
+    validate_user_docs?: boolean;
+    validate_vehicle_docs?: boolean;
+    validate_trailer_docs?: boolean;
 }
 
 interface WorkflowOption {
@@ -93,7 +98,7 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                 // 2. Get vehicle details
                 const { data: vehicleData, error: vehicleError } = await supabase
                     .from('vehicles')
-                    .select('id, plate, model, vehicle_type_id')
+                    .select('id, plate, model, vehicle_type_id, trailer_id')
                     .in('id', vehicleIds)
                     .eq('active', true); // Check active vehicle status just in case
 
@@ -194,7 +199,7 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                 // Then fetch the LATEST PUBLISHED version for each group
                 const { data: latestTemplates } = await supabase
                     .from('checklist_templates')
-                    .select('id, name, subject, version, group_id')
+                    .select('id, name, subject, version, group_id, validate_docs, validate_user_docs, validate_vehicle_docs, validate_trailer_docs')
                     .in('group_id', groupIds)
                     .eq('status', 'published')
                     .order('version', { ascending: false });
@@ -211,7 +216,11 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                             id: t.id,
                             name: t.name,
                             subject: t.subject,
-                            version: t.version
+                            version: t.version,
+                            validate_docs: t.validate_docs,
+                            validate_user_docs: t.validate_user_docs,
+                            validate_vehicle_docs: t.validate_vehicle_docs,
+                            validate_trailer_docs: t.validate_trailer_docs
                         });
                     }
                 });
@@ -228,7 +237,92 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
         if (mode === 'checklist' && step === 2 && currentUserId) fetchChecklists();
     }, [mode, step, selectedVehicle, currentUserId]);
 
-    const handleNext = () => {
+    const [deniedReasons, setDeniedReasons] = useState<{ doc: string; expiry?: string; status: 'VENCIDO' | 'AUSENTE' }[]>([]);
+
+    const checkDocuments = async (vehicle: Vehicle, settings: Partial<ChecklistOption>) => {
+        if (!currentUserId) return true;
+
+        // Skip if validation is disabled globally for this template
+        if (!settings.validate_docs) return true;
+
+        try {
+            setLoading(true);
+            setDeniedReasons([]);
+
+            // 1. Fetch all docs for Driver, Vehicle, and Trailer
+            const entityFilters = [`profile_id.eq.${currentUserId}`, `vehicle_id.eq.${vehicle.id}`];
+            if (vehicle.trailer_id) entityFilters.push(`trailer_id.eq.${vehicle.trailer_id}`);
+
+            const { data: docs, error } = await supabase
+                .from('management_documents')
+                .select('*')
+                .or(entityFilters.join(','));
+
+            if (error) throw error;
+
+            const today = new Date();
+            const violations: { doc: string; expiry?: string; status: 'VENCIDO' | 'AUSENTE' }[] = [];
+
+            // 1. Check for Expired Documents
+            (docs || []).forEach(doc => {
+                const expiry = new Date(doc.expiry_date);
+
+                // Only check if category is enabled
+                let checkThis = false;
+                if (doc.profile_id && settings.validate_user_docs) checkThis = true;
+                if (doc.vehicle_id && settings.validate_vehicle_docs) checkThis = true;
+                if (doc.trailer_id && settings.validate_trailer_docs) checkThis = true;
+
+                if (checkThis && expiry < today && doc.status !== 'EM_RENOVACAO') {
+                    violations.push({ doc: doc.document_type, expiry: doc.expiry_date, status: 'VENCIDO' });
+                }
+            });
+
+            // 2. Check for Missing Mandatory Documents
+            const MANDATORY = {
+                profile: settings.validate_user_docs ? ['CNH'] : [],
+                vehicle: settings.validate_vehicle_docs ? ['CRLV', 'CIV'] : [],
+                trailer: (vehicle.trailer_id && settings.validate_trailer_docs) ? ['CRLV', 'CIV'] : []
+            };
+
+            const userDocTypes = (docs || []).filter(d => d.profile_id === currentUserId).map(d => d.document_type);
+            const vehicleDocTypes = (docs || []).filter(d => d.vehicle_id === vehicle.id).map(d => d.document_type);
+            const trailerDocTypes = vehicle.trailer_id ? (docs || []).filter(d => d.trailer_id === vehicle.trailer_id).map(d => d.document_type) : [];
+
+            MANDATORY.profile.forEach(type => {
+                if (!userDocTypes.includes(type)) violations.push({ doc: type, status: 'AUSENTE' });
+            });
+            MANDATORY.vehicle.forEach(type => {
+                if (!vehicleDocTypes.includes(type)) violations.push({ doc: type, status: 'AUSENTE' });
+            });
+            MANDATORY.trailer.forEach(type => {
+                if (!trailerDocTypes.includes(type)) violations.push({ doc: type, status: 'AUSENTE' });
+            });
+
+            if (violations.length > 0) {
+                setDeniedReasons(violations);
+
+                // Log the denied attempt
+                await supabase.from('checklist_denied_attempts').insert({
+                    profile_id: currentUserId,
+                    vehicle_id: vehicle.id,
+                    trailer_id: vehicle.trailer_id,
+                    denial_reasons: violations
+                });
+
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error checking documents:', error);
+            return true;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleNext = async () => {
         if (selectedVehicle) {
             setStep(2);
             setSearchTerm('');
@@ -302,8 +396,13 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
         }
     };
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         if (mode === 'checklist' && selectedVehicle && selectedChecklistId) {
+            const checklist = checklists.find(c => c.id === selectedChecklistId);
+            if (checklist) {
+                const ok = await checkDocuments(selectedVehicle, checklist);
+                if (!ok) return;
+            }
             onStart(selectedChecklistId, selectedVehicle.id);
         } else if (mode === 'workflow') {
             handleStartWorkflow();
@@ -545,6 +644,46 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                     )}
                 </div>
             </div>
+            {/* Documentation Block Modal */}
+            {deniedReasons.length > 0 && (
+                <div className="fixed inset-0 bg-slate-900/80 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in zoom-in duration-300">
+                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border border-red-100">
+                        <div className="p-8 text-center space-y-4">
+                            <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                                <AlertCircle size={40} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Embarque Impedido</h3>
+                                <p className="text-sm text-slate-500 font-medium">Pendência Documental Detectada</p>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-2xl p-4 text-left space-y-3">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pendências Detectadas:</p>
+                                {deniedReasons.map((reason, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                        <span className="text-sm font-bold text-slate-700 uppercase">{reason.doc.replace(/_/g, ' ')}</span>
+                                        <span className={`text-xs font-bold ${reason.status === 'AUSENTE' ? 'text-amber-500' : 'text-red-500'}`}>
+                                            {reason.status === 'AUSENTE' ? 'FALTANDO' : new Date(reason.expiry!).toLocaleDateString('pt-BR')}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="space-y-3 pt-4">
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    Por favor, entre em contato com o setor de **Gerenciamento de Riscos** ou **Documentação** para regularizar sua situação.
+                                </p>
+                                <button
+                                    onClick={() => setDeniedReasons([])}
+                                    className="w-full bg-slate-800 text-white py-4 rounded-2xl font-bold text-sm hover:bg-slate-700 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                                >
+                                    ENTENDI
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

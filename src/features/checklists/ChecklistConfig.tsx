@@ -28,7 +28,23 @@ import {
   Trash2,
   Users,
   Clock,
-  Camera
+  Camera,
+  CheckCircle2,
+  AlertTriangle,
+  Scale,
+  Image,
+  Minus,
+  GripVertical,
+  AlertOctagon,
+  Share2,
+  MapPin,
+  Save,
+  Layout,
+  Database,
+  FileText,
+  Copy,
+  History,
+  Eye
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -37,7 +53,7 @@ import {
   ChecklistItem,
   ChecklistSubArea,
   ItemType,
-  VehicleType
+  OperationType as VehicleType
 } from '../../../types';
 import ChecklistVehicleTypes from './ChecklistVehicleTypes';
 import ChecklistUsers from './ChecklistUsers';
@@ -203,6 +219,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     require_analyst_signature: false // Signature when analyzing
   });
 
+  // Validation settings
+  const [validateDocs, setValidateDocs] = useState(false);
+  const [validateUserDocs, setValidateUserDocs] = useState(false);
+  const [validateVehicleDocs, setValidateVehicleDocs] = useState(false);
+  const [validateTrailerDocs, setValidateTrailerDocs] = useState(false);
+
   // Versioning State
   const [version, setVersion] = useState(1);
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('published');
@@ -310,6 +332,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
       setAnalysisSecondApprover((initialTemplate as any).analysis_second_approver || null);
       setAnalysisHasTimer((initialTemplate as any).analysis_has_timer || false);
       setAnalysisTimerMinutes((initialTemplate as any).analysis_timer_minutes || null);
+
+      // Load Validation settings
+      setValidateDocs(initialTemplate.validate_docs || false);
+      setValidateUserDocs(initialTemplate.validate_user_docs || false);
+      setValidateVehicleDocs(initialTemplate.validate_vehicle_docs || false);
+      setValidateTrailerDocs(initialTemplate.validate_trailer_docs || false);
 
       if (initialTemplate.structure?.areas) {
         // Map DB structure to local state structure (snake_case -> camelCase)
@@ -526,6 +554,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         // Scoring Fields (Extract from settings or state)
         scoring_enabled: settings.scoring_enabled,
         min_score_to_pass: settings.min_score_to_pass,
+
+        // Validation Settings
+        validate_docs: validateDocs,
+        validate_user_docs: validateUserDocs,
+        validate_vehicle_docs: validateVehicleDocs,
+        validate_trailer_docs: validateTrailerDocs,
 
         updated_at: new Date().toISOString(),
         published_at: new Date().toISOString(),
@@ -1124,6 +1158,45 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 badge="NOVO"
               />
             </div>
+          </div>
+        </Accordion>
+
+        <Accordion title="Documentos" isOpen={!!openPanels.docs} onToggle={() => togglePanel('docs')}>
+          <div className="space-y-6">
+            <Toggle
+              label="Obrigar validação de documentação"
+              description="Quando ativado, o sistema verificará a validade e presença de documentos antes de permitir o início da inspeção"
+              active={validateDocs}
+              onChange={setValidateDocs}
+              badge="REGRAS"
+            />
+
+            {validateDocs && (
+              <div className="ml-12 space-y-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2 duration-300">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Escolha o que validar:</p>
+
+                <Toggle
+                  label="Validar documentos do Motorista"
+                  description="Verifica se a CNH está presente e dentro do prazo de validade"
+                  active={validateUserDocs}
+                  onChange={setValidateUserDocs}
+                />
+
+                <Toggle
+                  label="Validar documentos do Veículo (Cavalo)"
+                  description="Verifica se CRLV e CIV estão presentes e dentro do prazo de validade"
+                  active={validateVehicleDocs}
+                  onChange={setValidateVehicleDocs}
+                />
+
+                <Toggle
+                  label="Validar documentos da Carreta/Implemento"
+                  description="Verifica se CRLV e CIV estão presentes e dentro do prazo de validade na carreta vinculada"
+                  active={validateTrailerDocs}
+                  onChange={setValidateTrailerDocs}
+                />
+              </div>
+            )}
           </div>
         </Accordion>
         <Accordion title="Cerca Digital" isOpen={!!openPanels.geo} onToggle={() => togglePanel('geo')}>

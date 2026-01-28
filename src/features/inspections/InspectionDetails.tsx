@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, User, Truck, MapPin, CheckCircle, AlertTriangle, XCircle, ChevronRight, Camera, FileText, FileDown, CheckCircle2, XOctagon } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Truck, MapPin, CheckCircle, AlertTriangle, XCircle, ChevronRight, Camera, FileText, FileDown, CheckCircle2, XOctagon, Smile, Meh, Frown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
@@ -19,6 +19,8 @@ const InspectionDetails: React.FC = () => {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [processing, setProcessing] = useState(false);
+    const [docs, setDocs] = useState<any[]>([]);
+    const [trailer, setTrailer] = useState<any>(null);
 
     // Analyst Signature States
     const [showAnalystSignatureModal, setShowAnalystSignatureModal] = useState(false);
@@ -55,7 +57,10 @@ const InspectionDetails: React.FC = () => {
                   *,
                   template:checklist_templates!checklist_template_id (*),
                   user:profiles!inspector_id (*),
-                  vehicle:vehicles!vehicle_id (*)
+                  vehicle:vehicles!vehicle_id (
+                    *,
+                    vehicle_types (*)
+                  )
                 `)
                 .eq('id', id)
                 .single();
@@ -82,6 +87,27 @@ const InspectionDetails: React.FC = () => {
 
             if (tmplStructure?.areas?.length > 0) {
                 setActiveAreaId(tmplStructure.areas[0].id);
+            }
+
+            // 3. Fetch Documentation for Driver, Vehicle, Trailer
+            const docFilters = [`profile_id.eq.${inspData.inspector_id}`, `vehicle_id.eq.${inspData.vehicle_id}`];
+            if (inspData.vehicle?.trailer_id) docFilters.push(`trailer_id.eq.${inspData.vehicle.trailer_id}`);
+
+            const { data: docData } = await supabase
+                .from('management_documents')
+                .select('*')
+                .or(docFilters.join(','));
+
+            setDocs(docData || []);
+
+            // 4. Fetch Trailer Plate if needed
+            if (inspData.vehicle?.trailer_id) {
+                const { data: trlData } = await supabase
+                    .from('trailers')
+                    .select('plate')
+                    .eq('id', inspData.vehicle.trailer_id)
+                    .single();
+                setTrailer(trlData);
             }
 
         } catch (error) {
@@ -450,6 +476,18 @@ const InspectionDetails: React.FC = () => {
                             <span className="text-xs font-black uppercase text-slate-400 tracking-widest">Índice do Relatório</span>
                         </div>
                         <nav className="p-2 space-y-1">
+                            {inspection.template?.validate_docs && docs.length > 0 && (
+                                <button
+                                    onClick={() => scrollToArea('docs')}
+                                    className={`w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-between ${activeAreaId === 'docs'
+                                        ? 'bg-blue-50 text-blue-900'
+                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                        }`}
+                                >
+                                    STATUS DE DOCUMENTAÇÃO
+                                    {activeAreaId === 'docs' && <ChevronRight size={14} />}
+                                </button>
+                            )}
                             {structure?.areas?.map((area: any) => (
                                 <button
                                     key={area.id}
@@ -467,97 +505,108 @@ const InspectionDetails: React.FC = () => {
                     </div>
                 </aside>
 
-                {/* MAIN REPORT */}
-                <main id="inspection-report" className="flex-1 space-y-8 pb-20 bg-white p-6 md:p-10">
+                {/* MAIN REPORT - A4 PAPER FORMAT */}
+                <main id="inspection-report" className="flex-1 space-y-4 pb-20 bg-white p-8 md:p-12 print:p-0 print:m-0 print:shadow-none">
 
                     {/* PRINTED REPORT HEADER */}
-                    <div className="pb-8 mb-8 border-b border-slate-200">
+                    {/* PRINTED REPORT HEADER - MINIMALIST A4 STYLE */}
+                    <div className="pb-6 mb-6 border-b-2 border-slate-900/10">
                         <div className="flex items-start justify-between mb-8">
                             <div>
-                                <h1 className="text-3xl font-bold text-slate-900 mb-2">{inspection.template?.name || 'Relatório de Inspeção'}</h1>
-                                <p className="text-slate-500">#{inspection.id}</p>
+                                <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-1">{inspection.template?.name || 'Relatório de Inspeção'}</h1>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Protocolo: {inspection.code || inspection.id}</p>
                             </div>
-                            <div className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                            <div className={`px-4 py-1 rounded-md text-[10px] font-black border uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                                 }`}>
                                 {inspection.status === 'completed' ? 'Concluído' : 'Em Andamento'}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            {/* Card 1: Inspector */}
-                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold overflow-hidden border-2 border-white shadow-sm">
-                                    {inspection.user?.avatar_url ? (
-                                        <img src={inspection.user.avatar_url} alt="User" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <User size={18} />
-                                    )}
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Inspetor</p>
-                                    <p className="text-sm font-bold text-slate-800">{inspection.user?.full_name || 'Desconhecido'}</p>
-                                </div>
+                        <div className="grid grid-cols-4 gap-4">
+                            {/* Data Point 1: Inspector */}
+                            <div className="border-r border-slate-100 pr-4">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 font-mono">INSPECIONADO POR</p>
+                                <p className="text-xs font-bold text-slate-700 uppercase">{inspection.user?.full_name || 'Desconhecido'}</p>
                             </div>
 
-                            {/* Card 2: Vehicle */}
-                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-500 shadow-sm">
-                                    <Truck size={18} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Veículo</p>
-                                    <p className="text-sm font-bold text-slate-800">{inspection.vehicle?.plate || 'N/A'}</p>
-                                    <p className="text-xs text-slate-500">{inspection.vehicle?.model}</p>
-                                </div>
+                            {/* Data Point 2: Vehicle */}
+                            <div className="border-r border-slate-100 pr-4">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 font-mono">VEÍCULO / PLACA</p>
+                                <p className="text-xs font-bold text-slate-700 uppercase">
+                                    {inspection.vehicle?.plate || 'N/A'}
+                                    {trailer?.plate && <span className="text-slate-300 mx-2 text-[10px] font-medium">•</span>}
+                                    {trailer?.plate && <span className="text-slate-500">{trailer.plate}</span>}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium uppercase">{inspection.vehicle?.model}</p>
                             </div>
 
-                            {/* Card 3: Date */}
-                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-500 shadow-sm">
-                                    <Calendar size={18} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Data</p>
-                                    <p className="text-sm font-bold text-slate-800">{new Date(inspection.started_at).toLocaleDateString('pt-BR')}</p>
-                                    <p className="text-xs text-slate-500">{new Date(inspection.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                                </div>
+                            {/* Data Point 3: Date */}
+                            <div className="border-r border-slate-100 pr-4">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 font-mono">DATA E HORÁRIO</p>
+                                <p className="text-xs font-bold text-slate-700 uppercase">
+                                    {new Date(inspection.started_at).toLocaleDateString('pt-BR')}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium tracking-tight">
+                                    {new Date(inspection.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} às {inspection.completed_at ? new Date(inspection.completed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                </p>
                             </div>
 
-                            {/* Card 4: Score (Conditional) */}
+                            {/* Data Point 4: Score (Conditional) */}
                             {((inspection.template?.scoring_enabled || inspection.template?.settings?.scoring_enabled)) && (
-                                <div className={`flex items-center gap-4 p-4 rounded-xl border ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70)
-                                    ? 'bg-green-50 border-green-100'
-                                    : 'bg-red-50 border-red-100'
-                                    }`}>
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg shadow-sm ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70)
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-red-100 text-red-700'
-                                        }`}>
-                                        {Math.round(inspection.score ?? calculatedScore?.score ?? 0)}
-                                    </div>
-                                    <div>
-                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'text-green-600' : 'text-red-600'
+                                <div className="pl-2">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 font-mono">STATUS FINAL</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-xs font-black uppercase ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'text-green-600' : 'text-red-600'
                                             }`}>
-                                            Pontuação
-                                        </p>
-                                        <p className={`text-sm font-bold ${(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'text-green-800' : 'text-red-800'
-                                            }`}>
-                                            {(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'Aprovado' : 'Reprovado'}
-                                        </p>
+                                            {(inspection.score ?? calculatedScore?.score ?? 0) >= (inspection.template.min_score_to_pass || 70) ? 'APROVADO' : 'REPROVADO'}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-slate-300">|</span>
+                                        <span className="text-xs font-bold text-slate-700">{Math.round(inspection.score ?? calculatedScore?.score ?? 0)} pts</span>
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
+
+                    {/* DOCUMENTATION STATUS SECTION - MINIMALIST - CONDITIONAL */}
+                    {inspection.template?.validate_docs && docs.length > 0 && (
+                        <div id="area-docs" className="mb-8 p-0 bg-transparent scroll-mt-44 break-inside-avoid shadow-none">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2 pb-2 border-b border-slate-100 font-mono">
+                                <FileText size={12} /> Status de Documentação (Consulta Atual)
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-8">
+                                {docs.map((doc, dIdx) => (
+                                    <div key={dIdx} className="flex items-center justify-between group">
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter mb-0.5">
+                                                {doc.profile_id ? 'Motorista' : doc.vehicle_id ? (inspection.vehicle?.plate || 'Veículo') : (trailer?.plate || 'Carreta')}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-slate-600 uppercase leading-none">{doc.document_type.replace(/_/g, ' ')}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${doc.status === 'VIGENTE' ? 'text-green-600 border-green-100 bg-green-50' :
+                                                doc.status === 'ALERTA' ? 'text-amber-600 border-amber-100 bg-amber-50' :
+                                                    doc.status === 'VENCIDO' ? 'text-red-600 border-red-100 bg-red-50' :
+                                                        'text-blue-600 border-blue-100 bg-blue-50'
+                                                }`}>
+                                                {doc.status}
+                                            </span>
+                                            <p className="text-[7px] text-slate-300 font-bold mt-1 font-mono uppercase tracking-tighter">Venc: {new Date(doc.expiry_date).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {structure?.areas?.map((area: any, idx: number) => (
-                        <section id={`area-${area.id}`} key={area.id} className="scroll-mt-44 animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="bg-slate-50/50 p-6 border-b border-slate-100 flex items-center gap-3">
-                                    <div className="w-1.5 h-6 bg-blue-900 rounded-full"></div>
-                                    <h2 className="text-lg font-bold text-slate-800">{area.name}</h2>
+                        <section id={`area-${area.id}`} key={area.id} className="scroll-mt-44 break-inside-avoid">
+                            <div className="bg-transparent overflow-hidden">
+                                <div className="py-2 border-b-2 border-slate-900/5 flex items-center gap-2 mb-2">
+                                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">{area.name}</h2>
+                                    <div className="h-px bg-slate-100 flex-1"></div>
                                 </div>
 
-                                <div className="divide-y divide-slate-100">
+                                <div className="divide-y divide-slate-100/50">
                                     {/* Render Area Items */}
                                     {area.items?.map((item: any) => renderReportItem(item, getAnswer(item.id), inspection.template?.settings?.show_item_timestamps))}
 
@@ -576,41 +625,45 @@ const InspectionDetails: React.FC = () => {
                             </div>
                         </section>
                     ))}
-                    {/* SIGNATURES SECTION - PRINT ONLY */}
-                    <div className="mt-12 pt-8 border-t border-slate-200 break-inside-avoid">
-                        <h3 className="text-lg font-bold text-slate-800 mb-6">Assinaturas</h3>
-                        <div className="flex flex-col md:flex-row justify-between gap-12">
-                            {/* Driver Signature */}
-                            <div className="flex-1 flex flex-col items-center">
-                                <div className="h-32 w-full max-w-xs border-b border-slate-400 mb-2 flex items-end justify-center">
-                                    {inspection.driver_signature_url ? (
-                                        <img src={inspection.driver_signature_url} alt="Assinatura Motorista" className="h-28 object-contain" />
-                                    ) : (
-                                        <span className="text-slate-400 text-sm mb-4 italic">Não assinado</span>
-                                    )}
-                                </div>
-                                <p className="font-bold text-slate-800">Assinatura do Motorista/Responsável</p>
-                                <p className="text-sm text-slate-500">{new Date(inspection.completed_at || inspection.updated_at).toLocaleDateString('pt-BR')}</p>
-                            </div>
-
-                            {/* Analyst Signature */}
-                            {(inspection.analysis_status === 'approved' || inspection.analysis_status === 'rejected') && (
-                                <div className="flex-1 flex flex-col items-center">
-                                    <div className="h-32 w-full max-w-xs border-b border-slate-400 mb-2 flex items-end justify-center">
-                                        {inspection.analyst_signature_url ? (
-                                            <img src={inspection.analyst_signature_url} alt="Assinatura Analista" className="h-28 object-contain" />
-                                        ) : (
-                                            <span className="text-slate-400 text-sm mb-4 italic">Assinado Digitalmente</span>
-                                        )}
+                    {/* SIGNATURES SECTION - PRINT ONLY - CONDITIONAL */}
+                    {(inspection.template?.settings?.require_driver_signature || inspection.template?.settings?.require_analyst_signature) && (
+                        <div className="mt-12 pt-8 border-t border-slate-200 break-inside-avoid">
+                            <h3 className="text-lg font-bold text-slate-800 mb-6">Assinaturas</h3>
+                            <div className="flex flex-col md:flex-row justify-between gap-12">
+                                {/* Driver Signature */}
+                                {inspection.template?.settings?.require_driver_signature && (
+                                    <div className="flex-1 flex flex-col items-center">
+                                        <div className="h-32 w-full max-w-xs border-b border-slate-400 mb-2 flex items-end justify-center">
+                                            {inspection.driver_signature_url ? (
+                                                <img src={inspection.driver_signature_url} alt="Assinatura Motorista" className="h-28 object-contain" />
+                                            ) : (
+                                                <span className="text-slate-400 text-sm mb-4 italic">Não assinado</span>
+                                            )}
+                                        </div>
+                                        <p className="font-bold text-slate-800">Assinatura do Motorista/Responsável</p>
+                                        <p className="text-sm text-slate-500">{new Date(inspection.completed_at || inspection.updated_at).toLocaleDateString('pt-BR')}</p>
                                     </div>
-                                    <p className="font-bold text-slate-800">Assinatura do Analista</p>
-                                    <p className="text-sm text-slate-500">
-                                        {inspection.analysis_status === 'approved' ? 'Aprovado' : 'Reprovado'} em {new Date(inspection.updated_at).toLocaleDateString('pt-BR')}
-                                    </p>
-                                </div>
-                            )}
+                                )}
+
+                                {/* Analyst Signature */}
+                                {inspection.template?.settings?.require_analyst_signature && (inspection.analysis_status === 'approved' || inspection.analysis_status === 'rejected') && (
+                                    <div className="flex-1 flex flex-col items-center">
+                                        <div className="h-32 w-full max-w-xs border-b border-slate-400 mb-2 flex items-end justify-center">
+                                            {inspection.analyst_signature_url ? (
+                                                <img src={inspection.analyst_signature_url} alt="Assinatura Analista" className="h-28 object-contain" />
+                                            ) : (
+                                                <span className="text-slate-400 text-sm mb-4 italic">Assinado Digitalmente</span>
+                                            )}
+                                        </div>
+                                        <p className="font-bold text-slate-800">Assinatura do Analista</p>
+                                        <p className="text-sm text-slate-500">
+                                            {inspection.analysis_status === 'approved' ? 'Aprovado' : 'Reprovado'} em {new Date(inspection.updated_at).toLocaleDateString('pt-BR')}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </main >
 
 
@@ -715,21 +768,17 @@ function renderReportItem(item: any, answerData: any, showTimestamps: boolean = 
     const answeredAt = answerData?.answered_at; // ← Recupera timestamp
 
     return (
-        <div key={item.id} className="p-6 hover:bg-slate-50/50 transition-colors">
-            <div className="flex flex-col md:flex-row gap-6">
+        <div key={item.id} className="py-3 px-1 transition-colors">
+            <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-start gap-3">
-                            <span className="mt-1 text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase border border-slate-200 shrink-0">
-                                {item.type}
-                            </span>
-                            <h4 className="text-sm font-bold text-slate-800 leading-snug">{item.name}</h4>
+                    <div className="flex items-start justify-between mb-1">
+                        <div className="flex items-start gap-2">
+                            <h4 className="text-xs font-bold text-slate-700 leading-tight">{item.name}</h4>
                         </div>
 
                         {/* Timestamp Display */}
                         {showTimestamps && answeredAt && (
-                            <div className="flex items-center gap-1.5 text-[10px] bg-slate-100 px-2 py-1 rounded-full text-slate-500 border border-slate-200" title="Horário da resposta">
-                                <span className="material-symbols-outlined text-[12px]">schedule</span>
+                            <div className="flex items-center gap-1 text-[9px] text-slate-300 font-mono" title="Horário da resposta">
                                 {new Date(answeredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </div>
                         )}
@@ -798,25 +847,21 @@ function renderAnswerValue(item: any, answer: any) {
         if (answer === 'conforme' || answer === 'bom' || answer === 'otimo' || answer === 'sim') {
             return (
                 <div className="flex flex-col items-center">
-                    <CheckCircle className="text-green-500 mb-1" size={28} />
-                    <span className="text-xs font-bold text-green-600 uppercase">Conforme</span>
-                    {/* Show +10pts if needed, maybe logic dependent */}
+                    <Smile className="text-green-500" size={24} strokeWidth={2.5} />
                 </div>
             );
         }
         if (answer === 'nao_conforme' || answer === 'ruim' || answer === 'pessimo' || answer === 'nao') {
             return (
                 <div className="flex flex-col items-center">
-                    <XCircle className="text-red-500 mb-1" size={28} />
-                    <span className="text-xs font-bold text-red-600 uppercase">Não Conforme</span>
+                    <Frown className="text-red-500" size={24} strokeWidth={2.5} />
                 </div>
             );
         }
         if (answer === 'regular' || answer === 'meh') {
             return (
                 <div className="flex flex-col items-center">
-                    <AlertTriangle className="text-yellow-500 mb-1" size={28} />
-                    <span className="text-xs font-bold text-yellow-600 uppercase">Regular</span>
+                    <Meh className="text-amber-500" size={24} strokeWidth={2.5} />
                 </div>
             );
         }

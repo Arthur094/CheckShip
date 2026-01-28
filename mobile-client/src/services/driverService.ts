@@ -96,7 +96,11 @@ export const driverService = {
                     structure,
                     status,
                     version,
-                    group_id
+                    group_id,
+                    validate_docs,
+                    validate_user_docs,
+                    validate_vehicle_docs,
+                    validate_trailer_docs
                 `)
                 .in('group_id', groupIds)
                 .eq('status', 'published');
@@ -251,5 +255,83 @@ export const driverService = {
 
         if (error) throw error;
         return data;
+    },
+
+    // 6. Validação de Documentos conforme regras do template
+    async checkDocuments(vehicleId: string, template: any) {
+        if (!template.validate_docs) return { ok: true };
+
+        try {
+            const userId = cacheService.getUserId();
+            if (!userId) return { ok: true };
+
+            // Step 1: Get vehicle details (to get trailer_id)
+            const { data: vehicle, error: vError } = await supabase
+                .from('vehicles')
+                .select('id, plate, trailer_id')
+                .eq('id', vehicleId)
+                .single();
+
+            if (vError) throw vError;
+
+            // Step 2: Fetch all relevant docs
+            const entityFilters = [`profile_id.eq.${userId}`, `vehicle_id.eq.${vehicle.id}`];
+            if (vehicle.trailer_id) entityFilters.push(`trailer_id.eq.${vehicle.trailer_id}`);
+
+            const { data: docs, error } = await supabase
+                .from('management_documents')
+                .select('*')
+                .or(entityFilters.join(','));
+
+            if (error) throw error;
+
+            const today = new Date();
+            const violations: { doc: string; expiry?: string; status: 'VENCIDO' | 'AUSENTE' }[] = [];
+
+            // 1. Check for Expired Documents
+            (docs || []).forEach(doc => {
+                const expiry = new Date(doc.expiry_date);
+                let checkThis = false;
+                if (doc.profile_id && template.validate_user_docs) checkThis = true;
+                if (doc.vehicle_id && template.validate_vehicle_docs) checkThis = true;
+                if (doc.trailer_id && template.validate_trailer_docs) checkThis = true;
+
+                if (checkThis && expiry < today && doc.status !== 'EM_RENOVACAO') {
+                    violations.push({ doc: doc.document_type, expiry: doc.expiry_date, status: 'VENCIDO' });
+                }
+            });
+
+            // 2. Check for Missing Mandatory Documents
+            const MANDATORY = {
+                profile: template.validate_user_docs ? ['CNH'] : [],
+                vehicle: template.validate_vehicle_docs ? ['CRLV', 'CIV'] : [],
+                trailer: (vehicle.trailer_id && template.validate_trailer_docs) ? ['CRLV', 'CIV'] : []
+            };
+
+            const userDocTypes = (docs || []).filter(d => d.profile_id === userId).map(d => d.document_type);
+            const vehicleDocTypes = (docs || []).filter(d => d.vehicle_id === vehicle.id).map(d => d.document_type);
+            const trailerDocTypes = vehicle.trailer_id ? (docs || []).filter(d => d.trailer_id === vehicle.trailer_id).map(d => d.document_type) : [];
+
+            MANDATORY.profile.forEach(type => {
+                if (!userDocTypes.includes(type)) violations.push({ doc: type, status: 'AUSENTE' });
+            });
+            MANDATORY.vehicle.forEach(type => {
+                if (!vehicleDocTypes.includes(type)) violations.push({ doc: type, status: 'AUSENTE' });
+            });
+            MANDATORY.trailer.forEach(type => {
+                if (!trailerDocTypes.includes(type)) violations.push({ doc: type, status: 'AUSENTE' });
+            });
+
+            if (violations.length > 0) {
+                return { ok: false, violations };
+            }
+
+            return { ok: true };
+
+        } catch (error) {
+            console.error('❌ Erro na validação de documentos:', error);
+            // Em caso de erro (ex: offline), permitimos prosseguir se não houver cache de documentos.
+            return { ok: true };
+        }
     }
 };

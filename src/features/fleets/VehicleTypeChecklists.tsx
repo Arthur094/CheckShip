@@ -27,6 +27,7 @@ const VehicleTypeChecklists: React.FC<VehicleTypeChecklistsProps> = ({ vehicleTy
             const { data: templatesData, error: templatesError } = await supabase
                 .from('checklist_templates')
                 .select('id, name')
+                .eq('status', 'published')
                 .order('name');
 
             if (templatesError) throw templatesError;

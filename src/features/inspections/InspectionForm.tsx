@@ -26,6 +26,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     const [answers, setAnswers] = useState<Record<string, InspectionAnswer>>({});
     const [saving, setSaving] = useState(false);
     const [inspectionId, setInspectionId] = useState<string | null>(null);
+    const isInitializing = React.useRef(false);
 
     // Signature states
     const [showSignatureModal, setShowSignatureModal] = useState(false);
@@ -33,6 +34,9 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
 
     useEffect(() => {
         const init = async () => {
+            if (isInitializing.current) return;
+            isInitializing.current = true;
+
             try {
                 // 1. Fetch Template
                 const { data: tmpl, error: tmplError } = await supabase
@@ -223,7 +227,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
 
             if (complete) {
                 if (template.requires_analysis) {
-                    initialStatus = 'in_analysis';
+                    initialStatus = 'pending';
                     analysisData = {
                         analysis_status: 'pending',
                         analysis_current_step: 0,
@@ -260,7 +264,10 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
             console.log('✅ Sucesso no update:', data);
 
             if (complete) {
-                alert('Inspeção finalizada com sucesso! Status atualizado para COMPLETED.');
+                const message = template.requires_analysis
+                    ? 'Inspeção finalizada! Enviada para análise.'
+                    : 'Inspeção finalizada com sucesso!';
+                alert(message);
                 onClose();
             } else {
                 // Just silent save or small toast could go here

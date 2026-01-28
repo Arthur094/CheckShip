@@ -287,7 +287,7 @@ const Vehicles: React.FC = () => {
           {showFilterPanel && (
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
               <MultiSelectDropdown
-                label="Tipo de Veículo"
+                label="Tipo de Operação"
                 options={vehicleTypes.map(t => t.name)}
                 selected={filters.vehicleTypes}
                 onChange={(selected) => setFilters(prev => ({ ...prev, vehicleTypes: selected }))}

@@ -109,6 +109,7 @@ const UserList: React.FC<UserListProps> = ({ onNew, onEdit }) => {
             const { data, error } = await supabase
                 .from('checklist_templates')
                 .select('id, name')
+                .eq('status', 'published')
                 .order('name');
 
             if (error) throw error;

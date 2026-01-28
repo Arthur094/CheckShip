@@ -342,7 +342,7 @@ const ChecklistList: React.FC<ChecklistListProps> = ({ onNew, onEdit }) => {
       setIsLoading(true);
       const { error } = await supabase
         .from('checklist_templates')
-        .update({ active: !allActive })
+        .update({ status: allActive ? 'archived' : 'published' })
         .in('id', Array.from(selectedIds));
       if (error) throw error;
       alert(`Checklists ${action === 'ativar' ? 'ativados' : 'desativados'}!`);
@@ -409,7 +409,7 @@ const ChecklistList: React.FC<ChecklistListProps> = ({ onNew, onEdit }) => {
               onToggle={() => handleFilterToggle('users')}
             />
             <MultiSelectDropdown
-              title="Tipos de Veículo"
+              title="Tipos de Operação"
               options={allVehicleTypes}
               selected={filters.vehicleTypes}
               onChange={(selected) => setFilters(prev => ({ ...prev, vehicleTypes: selected }))}

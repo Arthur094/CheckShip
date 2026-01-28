@@ -9,6 +9,9 @@ import MultiSelectDropdown from '../src/components/common/MultiSelectDropdown';
 interface HistoryItem {
   id: string;
   status: string;
+  analysis_status?: string;
+  analysis_current_step?: number;
+  analysis_total_steps?: number;
   started_at: string;
   completed_at: string;
   user: { full_name: string; role: string; id: string } | null;
@@ -17,11 +20,13 @@ interface HistoryItem {
     plate: string;
     model: string;
     type?: string;
+    branch_id?: string | null;
     vehicle_types?: { name: string; id: string }
   } | null;
   template: { name: string; id: string } | null;
   critical_count?: number;
 }
+
 
 interface FilterOptions {
   userTypes: { id: string; label: string }[];
@@ -29,6 +34,7 @@ interface FilterOptions {
   vehicles: { id: string; label: string }[];
   checklists: { id: string; label: string }[];
   users: { id: string; label: string }[];
+  branches: { id: string; label: string }[];
 }
 
 const ChecklistHistory: React.FC = () => {
@@ -48,7 +54,8 @@ const ChecklistHistory: React.FC = () => {
     vehicleTypes: [],
     vehicles: [],
     checklists: [],
-    users: []
+    users: [],
+    branches: []
   });
 
   // Filter State
@@ -63,7 +70,8 @@ const ChecklistHistory: React.FC = () => {
     checklists: [] as string[],
     userTypes: [] as string[],
     users: [] as string[],
-    platform: [] as string[]
+    platform: [] as string[],
+    branches: [] as string[]
   });
 
   const [activeFilterDropdown, setActiveFilterDropdown] = useState<string | null>(null);
@@ -86,19 +94,21 @@ const ChecklistHistory: React.FC = () => {
 
   const fetchFilterData = async () => {
     try {
-      const [vTypes, vecs, tpls, usrs] = await Promise.all([
+      const [vTypes, vecs, tpls, usrs, brns] = await Promise.all([
         supabase.from('vehicle_types').select('id, name').order('name'),
-        supabase.from('vehicles').select('id, plate').order('plate'),
+        supabase.from('vehicles').select('id, plate, branch_id').order('plate'),
         supabase.from('checklist_templates').select('id, name').order('name'),
-        supabase.from('profiles').select('id, full_name').order('full_name') // Using profiles for filtering by user
+        supabase.from('profiles').select('id, full_name').order('full_name'),
+        supabase.from('branches').select('id, name').eq('active', true).order('name')
       ]);
 
       setFilterOptions(prev => ({
         ...prev,
-        vehicleTypes: (vTypes.data || []).map(x => ({ id: x.name, label: x.name })), // Using name for UI filter match mostly, or align with how vehicle stores it. Vehicle stores name often in joins.
-        vehicles: (vecs.data || []).map(x => ({ id: x.id, label: x.plate })),
+        vehicleTypes: (vTypes.data || []).map(x => ({ id: x.name, label: x.name })),
+        vehicles: (vecs.data || []).map(x => ({ id: x.id, label: x.plate, branch_id: x.branch_id })),
         checklists: (tpls.data || []).map(x => ({ id: x.id, label: x.name })),
         users: (usrs.data || []).map(x => ({ id: x.id, label: x.full_name })),
+        branches: (brns.data || []).map(x => ({ id: x.id, label: x.name })),
       }));
     } catch (e) {
       console.error('Error fetching filter options', e);
@@ -156,7 +166,7 @@ const ChecklistHistory: React.FC = () => {
       if (vehicleIds.length > 0) {
         const { data: vehiclesData } = await supabase
           .from('vehicles')
-          .select('id, plate, model, vehicle_type_id')
+          .select('id, plate, model, vehicle_type_id, branch_id')
           .in('id', vehicleIds);
         (vehiclesData || []).forEach((v: any) => { vehiclesMap[v.id] = v; });
       }
@@ -289,6 +299,12 @@ const ChecklistHistory: React.FC = () => {
       // 9. Platform (Mocked for now as we don't have it)
       // if (filters.platform.length > 0) ...
 
+      // 10. Branch (Filial)
+      if (filters.branches.length > 0) {
+        const vehicleBranchId = item.vehicle?.branch_id;
+        if (!vehicleBranchId || !filters.branches.includes(vehicleBranchId)) return false;
+      }
+
       return true;
     });
   }, [history, filters]);
@@ -306,7 +322,8 @@ const ChecklistHistory: React.FC = () => {
       checklists: [],
       userTypes: [],
       users: [],
-      platform: []
+      platform: [],
+      branches: []
     });
   };
 
@@ -491,7 +508,7 @@ const ChecklistHistory: React.FC = () => {
             </div>
 
             <MultiSelectDropdown
-              title="Tipo de Veículo"
+              title="Tipo de Operação"
               options={filterOptions.vehicleTypes}
               selected={filters.vehicleTypes}
               onChange={s => setFilters({ ...filters, vehicleTypes: s })}
@@ -545,6 +562,16 @@ const ChecklistHistory: React.FC = () => {
               isOpen={activeFilterDropdown === 'platform'}
               onToggle={() => handleToggleFilter('platform')}
             />
+
+            <MultiSelectDropdown
+              title="Filial"
+              options={filterOptions.branches}
+              selected={filters.branches}
+              onChange={s => setFilters({ ...filters, branches: s })}
+              isOpen={activeFilterDropdown === 'branches'}
+              onToggle={() => handleToggleFilter('branches')}
+              searchPlaceholder="Buscar filial..."
+            />
           </div>
         )}
 
@@ -578,7 +605,7 @@ const ChecklistHistory: React.FC = () => {
                 </th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Código</th>
-                <th className="px-6 py-4">Tipo Veículo</th>
+                <th className="px-6 py-4">Tipo Operação</th>
                 <th className="px-6 py-4">Veículo</th>
                 <th className="px-6 py-4">Checklist</th>
                 <th className="px-6 py-4">Início</th>

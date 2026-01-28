@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import UserForm from './UserForm';
 import UserVehicles from './UserVehicles';
 import UserChecklists from './UserChecklists';
+import DocumentTab from '../../components/common/DocumentTab';
 import { supabase, getCompanyId } from '../../lib/supabase';
 
 interface UserConfigProps {
@@ -50,9 +51,6 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
         fetchProfiles();
     }, []);
 
-    // Ensure we have a stable ID for assignments even if isNew
-    const [stableId] = useState(formData.id || crypto.randomUUID());
-
     const isNew = !formData.id;
 
     useEffect(() => {
@@ -80,26 +78,26 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    const performSave = async (silent = false) => {
+    const performSave = async (silent = false): Promise<string | null> => {
         // Validation
         if (!formData.full_name.trim() || !formData.email.trim() || (!formData.role && !formData.access_profile_id)) {
             if (!silent) alert('Nome, E-mail e Perfil de Acesso são obrigatórios.');
-            return false;
+            return null;
         }
 
         if (isNew) {
             if (!formData.password) {
                 if (!silent) alert('Senha é obrigatória para novos usuários.');
-                return false;
+                return null;
             }
             if (formData.password !== formData.confirmPassword) {
                 if (!silent) alert('As senhas não coincidem.');
-                return false;
+                return null;
             }
         } else {
             if (formData.password && formData.password !== formData.confirmPassword) {
                 if (!silent) alert('As senhas não coincidem.');
-                return false;
+                return null;
             }
         }
 
@@ -138,7 +136,14 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
 
                 if (error) throw error;
                 if (!silent) alert('Usuário criado com sucesso!');
-                return true;
+
+                // Update state with the new ID
+                const newId = data?.user_id || null;
+                if (newId) {
+                    setFormData(prev => ({ ...prev, id: newId }));
+                }
+
+                return newId;
 
             } else {
                 // UPDATE EXISTING USER
@@ -148,8 +153,8 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                     .from('profiles')
                     .update({
                         full_name: formData.full_name,
-                        role: formData.role,
-                        access_profile_id: formData.access_profile_id,
+                        role: formData.role || null,
+                        access_profile_id: formData.access_profile_id || null,
                         document: formData.document,
                         phone: formData.phone,
                         force_password_change: formData.force_password_change,
@@ -179,7 +184,7 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                 }
 
                 if (!silent) alert('Usuário atualizado com sucesso!');
-                return true;
+                return formData.id;
             }
         } catch (error: any) {
             console.error('Error saving user FULL:', error);
@@ -194,7 +199,7 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
             } else {
                 alert('Erro ao salvar: ' + (error.message || 'Erro desconhecido'));
             }
-            return false;
+            return null;
         } finally {
             if (!silent) setLoading(false);
         }
@@ -210,9 +215,11 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
             case 'profile':
                 return <UserForm data={formData} onChange={handleFieldChange} />;
             case 'vehicles':
-                return <UserVehicles profileId={stableId} onEnsureExists={() => performSave(true)} />;
+                return <UserVehicles profileId={formData.id} onEnsureExists={() => performSave(true)} />;
             case 'checklists':
-                return <UserChecklists profileId={stableId} onEnsureExists={() => performSave(true)} />;
+                return <UserChecklists profileId={formData.id} onEnsureExists={() => performSave(true)} />;
+            case 'documents':
+                return <DocumentTab entityType="driver" entityId={formData.id} requiredDocs={['CNH', 'NR_35', 'NR_20', 'MOPP', 'ASO']} onEnsureExists={() => performSave(true)} />;
             default:
                 return <UserForm data={formData} onChange={handleFieldChange} />;
         }
@@ -236,13 +243,18 @@ const UserConfig: React.FC<UserConfigProps> = ({ onBack, initialData }) => {
                     </div>
                 </div>
 
-                {/* Tabs */}
                 <div className="flex px-8 gap-8">
                     <button
                         onClick={() => setActiveTab('profile')}
                         className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'profile' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         Dados Cadastrais
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('documents')}
+                        className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'documents' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Documentos
                     </button>
                     <button
                         onClick={() => setActiveTab('vehicles')}

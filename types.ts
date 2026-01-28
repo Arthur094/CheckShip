@@ -1,7 +1,7 @@
 /**
  * ENUMS - Padronização de Valores Fixos
  */
-export enum VehicleType {
+export enum OperationType {
   CAMINHAO = 'Caminhão',
   CARRETA = 'Carreta',
   BITREM = 'Bitrem',
@@ -27,16 +27,61 @@ export enum ItemType {
 /**
  * ENTIDADES PRINCIPAIS
  */
+export interface VehicleConfiguration {
+  id: string;
+  name: string;
+  category: 'RIGID' | 'ARTICULATED';
+  plates_count: number;
+}
+
 export interface Vehicle {
   id: string;
   plate: string;
   model: string;
-  type: VehicleType;
+  type: OperationType;
+  vehicle_type_id: string; // Refers to OperationType (e.g. Distribuição)
+  vehicle_configuration_id?: string; // Refers to Physical Configuration (e.g. VUC, Bitrem)
+  vehicle_configuration?: VehicleConfiguration;
   current_km: number;
   crlv_expiry: string;
   renavam: string;
   status: 'DISPONIVEL' | 'MANUTENCAO' | 'AGUARDANDO_REPARO';
   last_checklist_id?: string;
+  branch_id?: string | null;
+  trailer_id?: string | null;
+}
+
+export interface Trailer {
+  id: string;
+  plate: string;
+  active: boolean;
+  company_id: string;
+
+  civ_date?: string | null;
+  civ_expiry?: string | null;
+  civ_file_url?: string | null;
+
+  cipp_date?: string | null;
+  cipp_expiry?: string | null;
+  cipp_file_url?: string | null;
+
+  cvt_date?: string | null;
+  cvt_expiry?: string | null;
+  cvt_file_url?: string | null;
+
+  crlv_date?: string | null;
+  crlv_expiry?: string | null;
+  crlv_file_url?: string | null;
+
+  created_at: string;
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  active: boolean;
+  company_id?: string;
+  created_at?: string;
 }
 
 export interface Driver {
@@ -47,8 +92,10 @@ export interface Driver {
   cnh: string;
   cnh_expiry: string;
   branch: string;
+  branch_id?: string | null;
   active: boolean;
 }
+
 
 /**
  * ESTRUTURA DO CHECKLIST (DNA do Modelo)
@@ -110,7 +157,7 @@ export interface ChecklistTemplate {
   structure: {
     areas: ChecklistArea[];
   };
-  target_vehicle_types: VehicleType[]; // Quais veículos usam este modelo
+  target_vehicle_types: OperationType[]; // Quais operações usam este modelo
   assigned_user_ids: string[]; // Quais usuários podem ver este modelo
   scoring_enabled?: boolean; // ⬅️ Novo: Pontuação ativa?
   min_score_to_pass?: number; // Nota mínima (0-100)
@@ -122,6 +169,18 @@ export interface ChecklistTemplate {
   analysis_second_approver?: string | null;
   analysis_has_timer?: boolean;
   analysis_timer_minutes?: number | null;
+
+  // Versioning and Status
+  version?: number;
+  status?: 'draft' | 'published' | 'archived';
+  group_id?: string;
+  published_at?: string | null;
+
+  // Validation settings
+  validate_docs?: boolean;
+  validate_user_docs?: boolean;
+  validate_vehicle_docs?: boolean;
+  validate_trailer_docs?: boolean;
 
   created_at: string;
   updated_at: string;
@@ -155,4 +214,35 @@ export interface ChecklistRecord {
   location_start?: { lat: number; lng: number };
   location_end?: { lat: number; lng: number };
   signature_url?: string;
+}
+
+export type ManagementDocStatus = 'VIGENTE' | 'ALERTA' | 'VENCIDO' | 'EM_RENOVACAO';
+
+export interface ManagementDocument {
+  id: string;
+  profile_id?: string | null;
+  vehicle_id?: string | null;
+  trailer_id?: string | null;
+  document_type: string;
+  issue_date?: string | null;
+  expiry_date: string;
+  file_url?: string | null;
+  status: ManagementDocStatus;
+  renewal_anticipation_days: number;
+  observation?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ChecklistDeniedAttempt {
+  id: string;
+  profile_id?: string | null;
+  vehicle_id?: string | null;
+  trailer_id?: string | null;
+  denial_reasons: {
+    doc: string;
+    expiry: string;
+    message?: string;
+  }[];
+  created_at: string;
 }

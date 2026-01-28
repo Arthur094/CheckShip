@@ -9,7 +9,8 @@ import ChecklistConfig from './src/features/checklists/ChecklistConfig';
 import ChecklistList from './src/features/checklists/ChecklistList';
 import AccessProfiles from './src/features/access-profiles/AccessProfiles';
 import UserManagement from './src/features/users/UserManagement';
-import VehicleTypeManagement from './src/features/fleets/VehicleTypeManagement';
+import OperationTypeList from './src/features/operations/OperationTypeList';
+import OperationTypeConfig from './src/features/operations/OperationTypeConfig';
 import Announcements from './src/features/settings/Announcements';
 import LoginPage from './components/LoginPage';
 import { HelpCircle, Bell, Search as SearchIcon } from 'lucide-react';
@@ -22,6 +23,9 @@ import WorkflowList from './src/features/workflows/WorkflowList';
 import WorkflowConfig from './src/features/workflows/WorkflowConfig';
 import ReleaseFlowList from './src/features/workflows/ReleaseFlowList';
 import ReleaseFlowDetail from './src/features/workflows/ReleaseFlowDetail';
+import Branches from './src/features/branches/Branches';
+import Trailers from './src/features/trailers/Trailers';
+import DocManagementDashboard from './src/features/documents/DocManagementDashboard';
 
 
 
@@ -49,6 +53,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
 
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [selectedWorkflow, setSelectedWorkflow] = useState<any>(null);
+  const [selectedOperationType, setSelectedOperationType] = useState<any>(null);
 
   // Inspection State
   const [showInspectionModal, setShowInspectionModal] = useState(false);
@@ -82,16 +87,44 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
         return <Dashboard />;
       case 'history':
         return <ChecklistHistory />;
+      case 'docs-management':
+        return <DocManagementDashboard />;
       case 'config-vehicles':
         return <FleetManagement />;
       case 'config-users':
         return <UserManagement />;
-      case 'config-vtypes':
-        return <VehicleTypeManagement />;
+      case 'config-otypes':
+        return (
+          <OperationTypeList
+            onNew={() => {
+              setSelectedOperationType(null);
+              setActiveTab('config-otypes-edit');
+            }}
+            onEdit={(type) => {
+              setSelectedOperationType(type);
+              setActiveTab('config-otypes-edit');
+            }}
+          />
+        );
+      case 'config-otypes-edit':
+        return (
+          <OperationTypeConfig
+            initialData={selectedOperationType}
+            onBack={() => setActiveTab('config-otypes')}
+            onSave={() => {
+              // Optionally refresh list or just go back
+              setActiveTab('config-otypes');
+            }}
+          />
+        );
       case 'config-profiles':
         return <AccessProfiles />;
       case 'config-announcements':
         return <Announcements />;
+      case 'config-branches':
+        return <Branches />;
+      case 'config-trailers':
+        return <Trailers />;
       case 'config-models':
         return (
           <ChecklistList

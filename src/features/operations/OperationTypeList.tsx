@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Plus,
@@ -15,47 +14,39 @@ import {
 import { supabase } from '../../lib/supabase';
 import MultiSelectDropdown from '../../components/common/MultiSelectDropdown';
 
-interface FleetVehicle {
-    id: string;
-    plate: string;
-    model: string;
-    vehicle_types?: {
-        name: string;
-    } | null;
-    vehicle_configurations?: {
-        name: string;
-    } | null;
-    vehicle_type_id?: string;
-    vehicle_configuration_id?: string;
-    current_km?: number;
-    renavam?: string;
-    crlv_expiry?: string;
-    active: boolean;
-    // New fields implied by handleBulkExport
-    brand?: string;
-    year?: number;
-    color?: string;
-}
-
-interface VehicleType {
+interface OperationType {
     id: string;
     name: string;
+    description: string;
+    active: boolean;
+    // Joined data for filtering
+    vehicles?: { id: string; plate: string; }[];
+    vehicle_type_checklist_assignments?: {
+        checklist_templates?: { id: string; name: string; };
+    }[];
 }
 
-interface FleetListProps {
+interface Option {
+    id: string;
+    label: string;
+}
+
+interface OperationTypeListProps {
     onNew: () => void;
-    onEdit: (vehicle: any) => void;
+    onEdit: (vehicleType: OperationType) => void;
 }
 
 interface Filters {
-    vehicleTypes: string[];
+    vehicles: string[];
+    checklists: string[];
     active: string[];
 }
 
-const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
+const OperationTypeList: React.FC<OperationTypeListProps> = ({ onNew, onEdit }) => {
     // Data States
-    const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
-    const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
+    const [operationTypes, setOperationTypes] = useState<OperationType[]>([]);
+    const [allVehicles, setAllVehicles] = useState<Option[]>([]);
+    const [allChecklists, setAllChecklists] = useState<Option[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Filter States
@@ -63,77 +54,70 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
     const [filters, setFilters] = useState<Filters>({
-        vehicleTypes: [],
+        vehicles: [],
+        checklists: [],
         active: []
     });
 
     // Selection States
-    const [selectedVehicles, setSelectedVehicles] = useState<Set<string>>(new Set());
+    const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
     const [showSelectAll, setShowSelectAll] = useState(false);
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Data Fetching
-    const fetchVehicles = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('vehicles')
+
+            // Fetch Types with relationships (Mapped to vehicle_types)
+            const { data: typesData, error: typesError } = await supabase
+                .from('vehicle_types')
                 .select(`
-                    id,
-                    plate,
-                    model,
-                    current_km,
-                    renavam,
-                    crlv_expiry,
-                    active,
-                    vehicle_type_id,
-                    vehicle_configuration_id,
-                    vehicle_types (
-                        name
-                    ),
-                    vehicle_configurations (
-                        name
+                    *,
+                    vehicles (id, plate),
+                    vehicle_type_checklist_assignments (
+                        checklist_templates (id, name)
                     )
                 `)
-                .order('plate');
+                .order('name');
 
-            if (error) throw error;
+            if (typesError) throw typesError;
 
-            // Map array results to single objects (Supabase returns arrays for one-to-many/FKs sometimes depending on strictness, but usually for single FK it returns object if defined right, but types might infer array)
-            // Actually, if it's many-to-one, it should return object. But if mapped incorrectly, it returns array.
-            // Let's force cast or map.
-            const mappedData = (data || []).map((v: any) => ({
-                ...v,
-                vehicle_types: Array.isArray(v.vehicle_types) ? v.vehicle_types[0] : v.vehicle_types,
-                vehicle_configurations: Array.isArray(v.vehicle_configurations) ? v.vehicle_configurations[0] : v.vehicle_configurations
+            // Normalize types data
+            const normalizedTypes = (typesData || []).map((t: any) => ({
+                ...t,
+                // Ensure active defaults to true if null (migration default)
+                active: t.active ?? true
             }));
 
-            setVehicles(mappedData);
+            setOperationTypes(normalizedTypes);
+
+            // Extract unique Vehicles and Checklists for filter options
+            const vehiclesMap = new Map<string, string>();
+            const checklistsMap = new Map<string, string>();
+
+            normalizedTypes.forEach((type: any) => {
+                type.vehicles?.forEach((v: any) => vehiclesMap.set(v.id, v.plate));
+                type.vehicle_type_checklist_assignments?.forEach((a: any) => {
+                    if (a.checklist_templates) {
+                        checklistsMap.set(a.checklist_templates.id, a.checklist_templates.name);
+                    }
+                });
+            });
+
+            setAllVehicles(Array.from(vehiclesMap.entries()).map(([id, label]) => ({ id, label })));
+            setAllChecklists(Array.from(checklistsMap.entries()).map(([id, label]) => ({ id, label })));
+
         } catch (error: any) {
-            console.error('Error fetching vehicles:', error.message);
+            console.error('Error fetching data:', error.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchVehicleTypes = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('vehicle_types')
-                .select('id, name')
-                .order('name');
-
-            if (error) throw error;
-            setVehicleTypes(data || []);
-        } catch (error: any) {
-            console.error('Error fetching vehicle types:', error.message);
-        }
-    };
-
     useEffect(() => {
-        fetchVehicles();
-        fetchVehicleTypes();
+        fetchData();
     }, []);
 
     useEffect(() => {
@@ -150,27 +134,33 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
     }, []);
 
     // Filter Logic
-    const filteredVehicles = useMemo(() => {
-        return vehicles.filter(v => {
+    const filteredTypes = useMemo(() => {
+        return operationTypes.filter(t => {
             // Search
             const matchesSearch =
-                v.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                v.model.toLowerCase().includes(searchTerm.toLowerCase());
+                t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (t.description && t.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-            // Vehicle Type Filter
-            const matchesType = filters.vehicleTypes.length === 0 ||
-                (v.vehicle_types?.name && filters.vehicleTypes.includes(v.vehicle_types.name));
+            // Vehicle Filter
+            const matchesVehicles = filters.vehicles.length === 0 ||
+                (t.vehicles && t.vehicles.some(v => filters.vehicles.includes(v.id)));
+
+            // Checklist Filter
+            const matchesChecklists = filters.checklists.length === 0 ||
+                (t.vehicle_type_checklist_assignments && t.vehicle_type_checklist_assignments.some(a =>
+                    a.checklist_templates && filters.checklists.includes(a.checklist_templates.id)
+                ));
 
             // Active Filter
             const matchesActive = filters.active.length === 0 ||
-                (filters.active.includes('Ativo') && v.active) ||
-                (filters.active.includes('Inativo') && !v.active);
+                (filters.active.includes('Ativo') && t.active) ||
+                (filters.active.includes('Inativo') && !t.active);
 
-            return matchesSearch && matchesType && matchesActive;
+            return matchesSearch && matchesVehicles && matchesChecklists && matchesActive;
         });
-    }, [vehicles, searchTerm, filters]);
+    }, [operationTypes, searchTerm, filters]);
 
-    const hasActiveFilters = filters.vehicleTypes.length > 0 || filters.active.length > 0;
+    const hasActiveFilters = filters.vehicles.length > 0 || filters.checklists.length > 0 || filters.active.length > 0;
 
     // Handlers
     const handleFilterToggle = (filterName: string) => {
@@ -179,7 +169,8 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
 
     const handleClearFilters = () => {
         setFilters({
-            vehicleTypes: [],
+            vehicles: [],
+            checklists: [],
             active: []
         });
     };
@@ -190,43 +181,43 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
     };
 
     // Selection Handlers
-    const handleSelectVehicle = (id: string) => {
-        const newSelection = new Set(selectedVehicles);
+    const handleSelectType = (id: string) => {
+        const newSelection = new Set(selectedTypes);
         if (newSelection.has(id)) {
             newSelection.delete(id);
         } else {
             newSelection.add(id);
         }
-        setSelectedVehicles(newSelection);
+        setSelectedTypes(newSelection);
     };
 
     const handleSelectAll = () => {
-        const allIds = filteredVehicles.map(v => v.id);
-        setSelectedVehicles(new Set(allIds));
+        const allIds = filteredTypes.map(t => t.id);
+        setSelectedTypes(new Set(allIds));
         setShowSelectAll(false);
     };
 
     const handleDeselectAll = () => {
-        setSelectedVehicles(new Set());
+        setSelectedTypes(new Set());
     };
 
     // Bulk Actions
     const handleBulkDelete = async () => {
-        if (selectedVehicles.size === 0) return;
-        if (!confirm(`Tem certeza que deseja excluir ${selectedVehicles.size} veículos? Esta ação não pode ser desfeita.`)) return;
+        if (selectedTypes.size === 0) return;
+        if (!confirm(`Tem certeza que deseja excluir ${selectedTypes.size} tipos de operação? Veículos associados podem ficar sem classificação.`)) return;
 
         try {
             setLoading(true);
             const { error } = await supabase
-                .from('vehicles')
+                .from('vehicle_types')
                 .delete()
-                .in('id', Array.from(selectedVehicles));
+                .in('id', Array.from(selectedTypes));
 
             if (error) throw error;
 
-            alert(`${selectedVehicles.size} veículos excluídos com sucesso!`);
-            setSelectedVehicles(new Set());
-            fetchVehicles();
+            alert(`${selectedTypes.size} tipos excluídos com sucesso!`);
+            setSelectedTypes(new Set());
+            fetchData();
         } catch (error: any) {
             alert('Erro ao excluir: ' + error.message);
             setLoading(false);
@@ -234,27 +225,27 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
     };
 
     const handleBulkToggleActive = async () => {
-        if (selectedVehicles.size === 0) return;
+        if (selectedTypes.size === 0) return;
 
-        const selectedVehiclesData = vehicles.filter(v => selectedVehicles.has(v.id));
-        const allActive = selectedVehiclesData.every(v => v.active);
+        const selectedTypesData = operationTypes.filter(t => selectedTypes.has(t.id));
+        const allActive = selectedTypesData.every(t => t.active);
         const action = allActive ? 'desativar' : 'ativar';
         const newStatus = !allActive;
 
-        if (!confirm(`Tem certeza que deseja ${action} ${selectedVehicles.size} veículos?`)) return;
+        if (!confirm(`Tem certeza que deseja ${action} ${selectedTypes.size} tipos de operação?`)) return;
 
         try {
             setLoading(true);
             const { error } = await supabase
-                .from('vehicles')
+                .from('vehicle_types')
                 .update({ active: newStatus })
-                .in('id', Array.from(selectedVehicles));
+                .in('id', Array.from(selectedTypes));
 
             if (error) throw error;
 
-            alert(`Veículos ${action === 'ativar' ? 'ativados' : 'desativados'} com sucesso!`);
-            setSelectedVehicles(new Set());
-            fetchVehicles();
+            alert(`Tipos ${action === 'ativar' ? 'ativados' : 'desativados'} com sucesso!`);
+            setSelectedTypes(new Set());
+            fetchData();
         } catch (error: any) {
             alert(`Erro ao ${action}: ` + error.message);
             setLoading(false);
@@ -262,52 +253,45 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
     };
 
     const handleBulkExport = () => {
-        if (selectedVehicles.size === 0) return;
-
-        if (!confirm(`Exportar ${selectedVehicles.size} veículos selecionados?`)) return;
+        if (selectedTypes.size === 0) return;
+        if (!confirm(`Exportar ${selectedTypes.size} tipos selecionados?`)) return;
 
         try {
-            const selectedData = vehicles.filter(v => selectedVehicles.has(v.id));
+            const selectedData = operationTypes.filter(t => selectedTypes.has(t.id));
 
-            // Only 'Dados Cadastrais' screens data
             const csvContent = [
-                ['Placa', 'Modelo', 'Marca', 'Ano', 'Cor', 'Renavam', 'KM Atual', 'Tipo de Operação', 'Status'],
-                ...selectedData.map(v => [
-                    v.plate,
-                    v.model,
-                    (v as any).brand || '',
-                    (v as any).year?.toString() || '',
-                    (v as any).color || '',
-                    v.renavam || '',
-                    v.current_km?.toString() || '',
-                    v.vehicle_types?.name || '',
-                    v.active ? 'Ativo' : 'Inativo'
+                ['Nome', 'Descrição', 'Veículos Ativos', 'Checklists Associados', 'Status'],
+                ...selectedData.map(t => [
+                    t.name,
+                    t.description || '',
+                    t.vehicles?.length || 0,
+                    t.vehicle_type_checklist_assignments?.length || 0,
+                    t.active ? 'Ativo' : 'Inativo'
                 ])
             ].map(e => e.join(',')).join('\n');
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `veiculos_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `tipos_operacao_export_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
-            alert(`${selectedVehicles.size} veículos exportados com sucesso.`);
         } catch (error: any) {
-            console.error('Erro ao exportar:', error);
             alert('Erro ao exportar: ' + error.message);
         }
     };
 
-    const handleDeleteSingle = async (vehicle: FleetVehicle) => {
-        if (confirm(`Tem certeza que deseja excluir o veículo ${vehicle.plate}?`)) {
+    // Single Actions
+    const handleDeleteSingle = async (type: OperationType) => {
+        if (confirm(`Tem certeza que deseja excluir o tipo "${type.name}"?`)) {
             try {
                 setLoading(true);
                 const { error } = await supabase
-                    .from('vehicles')
+                    .from('vehicle_types')
                     .delete()
-                    .eq('id', vehicle.id);
+                    .eq('id', type.id);
 
                 if (error) throw error;
-                fetchVehicles();
+                fetchData();
             } catch (error: any) {
                 alert('Erro ao excluir: ' + error.message);
                 setLoading(false);
@@ -315,18 +299,18 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
         }
     };
 
-    const handleDeactivateSingle = async (vehicle: FleetVehicle) => {
-        const action = vehicle.active ? 'desativar' : 'ativar';
-        if (confirm(`Tem certeza que deseja ${action} o veículo ${vehicle.plate}?`)) {
+    const handleToggleActiveSingle = async (type: OperationType) => {
+        const action = type.active ? 'desativar' : 'ativar';
+        if (confirm(`Tem certeza que deseja ${action} o tipo "${type.name}"?`)) {
             try {
                 setLoading(true);
                 const { error } = await supabase
-                    .from('vehicles')
-                    .update({ active: !vehicle.active })
-                    .eq('id', vehicle.id);
+                    .from('vehicle_types')
+                    .update({ active: !type.active })
+                    .eq('id', type.id);
 
                 if (error) throw error;
-                fetchVehicles();
+                fetchData();
             } catch (error: any) {
                 alert(`Erro ao ${action}: ` + error.message);
                 setLoading(false);
@@ -339,7 +323,8 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
             {/* Header */}
             <div className="bg-white px-8 py-5 border-b border-slate-200 flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-bold text-slate-800">Frotas</h1>
+                    <h1 className="text-xl font-bold text-slate-800">Tipos de Operação</h1>
+                    <p className="text-sm text-slate-500 hidden md:block">Categorias e Classificações</p>
                 </div>
                 <button
                     onClick={onNew}
@@ -356,7 +341,7 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                     <Search size={20} className="absolute left-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar por placa, modelo..."
+                        placeholder="Buscar por nome, descrição..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full pl-12 pr-12 py-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all placeholder:text-slate-400 bg-slate-50"
@@ -373,23 +358,32 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
             {/* Filter Panel */}
             {showFilterPanel && (
                 <div className="bg-white px-8 py-6 border-b border-slate-200">
-                    <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <MultiSelectDropdown
-                            title="Tipo de Operação"
-                            options={vehicleTypes.map(t => ({ id: t.name, label: t.name }))}
-                            selected={filters.vehicleTypes}
-                            onChange={(selected) => setFilters(prev => ({ ...prev, vehicleTypes: selected }))}
-                            searchPlaceholder="Digite para pesquisar"
-                            isOpen={activeFilter === 'types'}
-                            onToggle={() => handleFilterToggle('types')}
+                            title="Veículos Associados"
+                            options={allVehicles}
+                            selected={filters.vehicles}
+                            onChange={(selected) => setFilters(prev => ({ ...prev, vehicles: selected }))}
+                            searchPlaceholder="Buscar veículo..."
+                            isOpen={activeFilter === 'vehicles'}
+                            onToggle={() => handleFilterToggle('vehicles')}
                         />
 
                         <MultiSelectDropdown
-                            title="Ativo"
+                            title="Checklists Associados"
+                            options={allChecklists}
+                            selected={filters.checklists}
+                            onChange={(selected) => setFilters(prev => ({ ...prev, checklists: selected }))}
+                            searchPlaceholder="Buscar checklist..."
+                            isOpen={activeFilter === 'checklists'}
+                            onToggle={() => handleFilterToggle('checklists')}
+                        />
+
+                        <MultiSelectDropdown
+                            title="Status (Ativo)"
                             options={[{ id: 'Ativo', label: 'Sim' }, { id: 'Inativo', label: 'Não' }]}
                             selected={filters.active}
                             onChange={(selected) => setFilters(prev => ({ ...prev, active: selected }))}
-                            searchPlaceholder="Digite para pesquisar"
                             isOpen={activeFilter === 'active'}
                             onToggle={() => handleFilterToggle('active')}
                         />
@@ -416,10 +410,18 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
             {hasActiveFilters && (
                 <div className="bg-slate-100 px-8 py-3 border-b border-slate-200 flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-medium text-slate-600">Filtros ativos:</span>
-                    {filters.vehicleTypes.length > 0 && (
+                    {filters.vehicles.length > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
-                            Tipo ({filters.vehicleTypes.length})
-                            <button onClick={() => setFilters(prev => ({ ...prev, vehicleTypes: [] }))} className="hover:text-red-600">
+                            Veículos ({filters.vehicles.length})
+                            <button onClick={() => setFilters(prev => ({ ...prev, vehicles: [] }))} className="hover:text-red-600">
+                                <X size={14} />
+                            </button>
+                        </span>
+                    )}
+                    {filters.checklists.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs">
+                            Checklists ({filters.checklists.length})
+                            <button onClick={() => setFilters(prev => ({ ...prev, checklists: [] }))} className="hover:text-red-600">
                                 <X size={14} />
                             </button>
                         </span>
@@ -437,15 +439,15 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
 
             {/* List content */}
             <div className="flex-1 overflow-x-auto p-8">
-                <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-w-[900px] mb-20">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-w-[800px] mb-20">
                     {/* Table Header */}
                     <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
                         <div
-                            className="col-span-1 flex items-center gap-2 relative"
+                            className="col-span-12 md:col-span-6 flex items-center gap-2 relative"
                             onMouseEnter={() => setShowSelectAll(true)}
                             onMouseLeave={() => setShowSelectAll(false)}
                         >
-                            {showSelectAll && selectedVehicles.size === 0 && (
+                            {showSelectAll && selectedTypes.size === 0 && (
                                 <button
                                     onClick={handleSelectAll}
                                     className="absolute -left-1 px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded shadow-sm hover:bg-blue-700 transition-all z-10 w-max"
@@ -453,23 +455,22 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                                     TODOS
                                 </button>
                             )}
-                            {selectedVehicles.size > 0 && (
+                            {selectedTypes.size > 0 && (
                                 <button
                                     onClick={handleDeselectAll}
-                                    className="text-blue-600 hover:text-blue-800"
+                                    className="text-blue-600 hover:text-blue-800 mr-2"
                                     title="Desmarcar todos"
                                 >
                                     <X size={16} />
                                 </button>
                             )}
-                            {!showSelectAll && selectedVehicles.size === 0 && (
-                                <span className="text-slate-400 px-1">-</span>
+                            {!showSelectAll && selectedTypes.size === 0 && (
+                                <span className="text-slate-400 px-1 mr-2">-</span>
                             )}
+                            Nome
                         </div>
-                        <div className="col-span-3">Placa</div>
-                        <div className="col-span-2">Modelo/Config.</div>
-                        <div className="col-span-3">Tipo de Operação / Unidade</div>
-                        <div className="col-span-2 text-right">Status</div>
+                        <div className="hidden md:block col-span-4">Descrição</div>
+                        <div className="hidden md:block col-span-2 text-right">Status</div>
                     </div>
 
                     {/* Table Rows */}
@@ -477,53 +478,47 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                         {loading ? (
                             <div className="p-12 text-center text-slate-400">
                                 <div className="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full mb-2"></div>
-                                <p className="text-sm">Carregando veículos...</p>
+                                <p className="text-sm">Carregando tipos de operação...</p>
                             </div>
-                        ) : filteredVehicles.length === 0 ? (
+                        ) : filteredTypes.length === 0 ? (
                             <div className="p-12 text-center text-slate-400">
-                                <p className="text-sm">Nenhum veículo encontrado.</p>
+                                <p className="text-sm">Nenhum tipo de operação encontrado.</p>
                             </div>
                         ) : (
-                            filteredVehicles.map((vehicle) => (
+                            filteredTypes.map((type) => (
                                 <div
-                                    key={vehicle.id}
-                                    className={`grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors group relative ${selectedVehicles.has(vehicle.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}
+                                    key={type.id}
+                                    className={`grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors group relative ${selectedTypes.has(type.id) ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}
                                 >
-                                    <div className="col-span-1 flex items-center">
+                                    <div className="col-span-12 md:col-span-6 flex items-center gap-4">
                                         <input
                                             type="checkbox"
-                                            checked={selectedVehicles.has(vehicle.id)}
-                                            onChange={() => handleSelectVehicle(vehicle.id)}
-                                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                            checked={selectedTypes.has(type.id)}
+                                            onChange={() => handleSelectType(type.id)}
+                                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer min-w-[16px]"
                                         />
-                                    </div>
-                                    <div className="col-span-3 text-sm font-bold text-slate-700 relative group/plate">
-                                        {vehicle.plate}
-                                        {/* Tooltip on Hover */}
-                                        <div className="absolute left-20 top-0 hidden group-hover/plate:block z-20 bg-slate-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                            Unidade: {vehicle.vehicle_types?.name || 'Não definida'}
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium text-slate-700">{type.name}</span>
+                                            {/* Mobile Description */}
+                                            {type.description && (
+                                                <span className="md:hidden text-xs text-slate-400 truncate max-w-[200px]">{type.description}</span>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className="col-span-2 text-sm text-slate-600">
-                                        {vehicle.model}
-                                        {vehicle.vehicle_configurations?.name && (
-                                            <span className="block text-xs text-slate-400 font-medium">
-                                                {vehicle.vehicle_configurations.name}
-                                            </span>
-                                        )}
+
+                                    <div className="hidden md:block col-span-4 text-sm text-slate-600 truncate">
+                                        {type.description}
                                     </div>
-                                    <div className="col-span-3 text-sm text-slate-600 font-bold">
-                                        {vehicle.vehicle_types?.name || 'Não definido'}
-                                    </div>
-                                    <div className="col-span-2 flex items-center justify-end gap-3 text-right">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${vehicle.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {vehicle.active ? 'Ativo' : 'Inativo'}
+
+                                    <div className="hidden md:flex col-span-2 items-center justify-end gap-3 text-right">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide ${type.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {type.active ? 'Ativo' : 'Inativo'}
                                         </span>
 
                                         {/* Hover Actions */}
-                                        <div className={`flex items-center justify-end gap-1 ${activeMenu === vehicle.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                                        <div className={`flex items-center justify-end gap-1 ${activeMenu === type.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                                             <button
-                                                onClick={() => onEdit(vehicle)}
+                                                onClick={() => onEdit(type)}
                                                 className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-blue-900 transition-colors"
                                                 title="Editar"
                                             >
@@ -531,14 +526,14 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                                             </button>
                                             <div className="relative">
                                                 <button
-                                                    onClick={(e) => toggleMenu(e, vehicle.id)}
-                                                    className={`p-2 rounded-full transition-colors ${activeMenu === vehicle.id ? 'bg-slate-200 text-slate-700' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-700'}`}
+                                                    onClick={(e) => toggleMenu(e, type.id)}
+                                                    className={`p-2 rounded-full transition-colors ${activeMenu === type.id ? 'bg-slate-200 text-slate-700' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-700'}`}
                                                 >
                                                     <MoreVertical size={16} />
                                                 </button>
 
                                                 {/* Dropdown Menu */}
-                                                {activeMenu === vehicle.id && (
+                                                {activeMenu === type.id && (
                                                     <>
                                                         <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
                                                         <div ref={menuRef} className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20">
@@ -547,10 +542,10 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setActiveMenu(null);
-                                                                    handleDeactivateSingle(vehicle);
+                                                                    handleToggleActiveSingle(type);
                                                                 }}
                                                             >
-                                                                {vehicle.active ? (
+                                                                {type.active ? (
                                                                     <>
                                                                         <ToggleLeft size={16} />
                                                                         Desativar
@@ -568,7 +563,7 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setActiveMenu(null);
-                                                                    handleDeleteSingle(vehicle);
+                                                                    handleDeleteSingle(type);
                                                                 }}
                                                             >
                                                                 <Trash2 size={16} />
@@ -587,8 +582,8 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                 </div>
             </div>
 
-            {/* Bottom Bar for Bulk Actions (Matches UserList) */}
-            {selectedVehicles.size > 0 && (
+            {/* Bottom Bar for Bulk Actions (Matches FleetList pattern) */}
+            {selectedTypes.size > 0 && (
                 <div className="sticky bottom-0 bg-white border-t border-slate-200 px-8 py-4 flex items-center justify-between shadow-lg z-30">
                     <div className="flex items-center gap-4">
                         {/* Delete Button */}
@@ -606,7 +601,7 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
                             className="p-2 hover:bg-blue-50 rounded-lg text-slate-600 hover:text-blue-600 transition-colors"
                             title="Ativar/Inativar selecionados"
                         >
-                            {vehicles.filter(v => selectedVehicles.has(v.id)).every(v => v.active) ? (
+                            {operationTypes.filter(t => selectedTypes.has(t.id)).every(t => t.active) ? (
                                 <ToggleRight size={20} />
                             ) : (
                                 <ToggleLeft size={20} />
@@ -625,13 +620,12 @@ const FleetList: React.FC<FleetListProps> = ({ onNew, onEdit }) => {
 
                     {/* Counter */}
                     <div className="text-sm text-slate-600 font-medium">
-                        {selectedVehicles.size} de {filteredVehicles.length} selecionado{selectedVehicles.size !== 1 ? 's' : ''}
+                        {selectedTypes.size} de {filteredTypes.length} selecionado{selectedTypes.size !== 1 ? 's' : ''}
                     </div>
                 </div>
             )}
         </div>
-
     );
 };
 
-export default FleetList;
+export default OperationTypeList;

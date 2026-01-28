@@ -9,6 +9,8 @@ const TemplateSelectScreen: React.FC = () => {
   const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [checkingDocs, setCheckingDocs] = useState(false);
+  const [violations, setViolations] = useState<{ doc: string; status: 'VENCIDO' | 'AUSENTE'; expiry?: string }[] | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -40,6 +42,28 @@ const TemplateSelectScreen: React.FC = () => {
   const filteredTemplates = templates.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleSelectTemplate = async (template: any) => {
+    if (!vehicleId) return;
+
+    setCheckingDocs(true);
+    setViolations(null);
+
+    try {
+      const result = await driverService.checkDocuments(vehicleId, template);
+      if (result.ok) {
+        navigate(`/inspection/${vehicleId}/${template.id}`);
+      } else {
+        setViolations(result.violations || []);
+      }
+    } catch (error) {
+      console.error('Erro na validação de documentos:', error);
+      // Fallback: permite prosseguir em caso de erro técnico na validação
+      navigate(`/inspection/${vehicleId}/${template.id}`);
+    } finally {
+      setCheckingDocs(false);
+    }
+  };
 
   return (
     <div className="bg-background-light min-h-screen flex flex-col">
@@ -91,8 +115,9 @@ const TemplateSelectScreen: React.FC = () => {
               filteredTemplates.map((template) => (
                 <button
                   key={template.id}
-                  onClick={() => navigate(`/inspection/${vehicleId}/${template.id}`)}
-                  className="w-full flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-left"
+                  onClick={() => handleSelectTemplate(template)}
+                  disabled={checkingDocs}
+                  className={`w-full flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-left transition-all ${checkingDocs ? 'opacity-50' : 'active:scale-[0.98]'}`}
                 >
                   <div className="w-12 h-12 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center">
                     <span className="material-symbols-outlined text-2xl">assignment</span>
@@ -108,6 +133,56 @@ const TemplateSelectScreen: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Modal de Alerta de Documentos */}
+      {violations && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="bg-red-50 p-6 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-4xl">warning</span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Bloqueio Documental</h2>
+              <p className="text-sm text-slate-500 mt-2">
+                Não é possível iniciar esta inspeção devido a pendências nos documentos obrigatórios.
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-3">
+                {violations.map((v, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${v.status === 'VENCIDO' ? 'bg-orange-100 text-orange-600' : 'bg-red-100 text-red-600'}`}>
+                      <span className="material-symbols-outlined text-xl">{v.status === 'VENCIDO' ? 'event_busy' : 'description'}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{v.doc}</p>
+                      <p className={`text-[10px] font-black uppercase tracking-wider ${v.status === 'VENCIDO' ? 'text-orange-600' : 'text-red-600'}`}>
+                        {v.status === 'VENCIDO' ? `Vencido em ${new Date(v.expiry!).toLocaleDateString('pt-BR')}` : 'Documento Ausente'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setViolations(null)}
+                className="w-full mt-6 py-4 bg-slate-900 text-white rounded-2xl font-bold active:scale-95 transition-all shadow-lg"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay de Loading */}
+      {checkingDocs && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-slate-600 font-bold">Validando documentos...</p>
+        </div>
+      )}
     </div>
   );
 };

@@ -19,12 +19,16 @@ export interface Inspection {
 
 export interface Template {
   id: string;
-  title: string;
+  name: string; // Renamed from title to match DB and Web
   description: string;
-  duration: string;
-  icon: string;
-  iconColorClass: string;
-  iconBgClass: string;
+  duration?: string;
+  icon?: string;
+  iconColorClass?: string;
+  iconBgClass?: string;
+  validate_docs?: boolean;
+  validate_user_docs?: boolean;
+  validate_vehicle_docs?: boolean;
+  validate_trailer_docs?: boolean;
 }
 
 export interface User {
