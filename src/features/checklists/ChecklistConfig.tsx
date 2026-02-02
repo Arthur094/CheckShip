@@ -1113,8 +1113,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               description="Quando desabilitado, apenas a câmera poderá ser usada para itens com anexo obrigatório"
               active={settings.allow_gallery}
               onChange={(val) => setSettings(prev => ({ ...prev, allow_gallery: val }))}
-              disabled={true}
-              badge="EM BREVE"
+              badge="CONFIG"
             />
             <Toggle
               label="Responder itens em massa"
@@ -1701,30 +1700,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   ))}
                 </div>
 
-                {/* Visual Style Selection */}
-                <div className="space-y-2 mb-4">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Estilo Visual</label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: 'default', label: 'Padrão (Texto)' },
-                      { id: 'thumbs', label: 'Joinha (👍/👎)' },
-                      { id: 'smile_3', label: 'Carinhas (🙂/😐/☹️)' },
-                      { id: 'happy_sad', label: 'Feliz/Triste (🙂/☹️)' },
-                      { id: 'n_s', label: 'Botões N / S' }
-                    ].map(style => (
-                      <button
-                        key={style.id}
-                        onClick={() => setInputStyle(style.id as any)}
-                        className={`px-3 py-2 rounded-lg text-xs font-bold border ${inputStyle === style.id
-                          ? 'bg-blue-900 text-white border-blue-900'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                          }`}
-                      >
-                        {style.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
 
                 {/* Photo Requirements */}
                 <div className="space-y-2 p-3 bg-red-50 border border-red-100 rounded-xl" >

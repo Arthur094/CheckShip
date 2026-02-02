@@ -14,9 +14,11 @@ interface InspectionFormProps {
 
 interface InspectionAnswer {
     item_id: string;
-    answer: any;
+    answer?: any;
     comment?: string;
     photos?: string[];
+    imageUrl?: string;
+    answered_at?: string;
 }
 
 const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId, onClose }) => {
@@ -347,6 +349,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                                     value={answers[item.id]?.answer}
                                     onChange={(val) => handleAnswerChange(item.id, val)}
                                     inspectionId={inspectionId}
+                                    allowGallery={template?.settings?.allow_gallery ?? true}
                                 />
                             ))}
 
@@ -364,6 +367,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                                                 value={answers[item.id]?.answer}
                                                 onChange={(val) => handleAnswerChange(item.id, val)}
                                                 inspectionId={inspectionId}
+                                                allowGallery={template?.settings?.allow_gallery ?? true}
                                             />
                                         ))}
                                     </div>
@@ -392,11 +396,12 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     );
 };
 
-const InspectionItem = ({ item, value, onChange, inspectionId }: {
+const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
     item: any,
     value: any,
     onChange: (val: any) => void,
-    inspectionId: string | null
+    inspectionId: string | null,
+    allowGallery: boolean
 }) => {
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
@@ -869,8 +874,7 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
                     )}
 
                     {/* --- MEDIA ATTACHMENTS (STRICT RULE) --- */}
-                    {/* Show if there are any photo rules configured. Highlight when mandatory. */}
-                    {console.log('🔴 Verificando attachment. shouldShow:', shouldShowAttachmentField, 'isMandatory:', isMandatoryAttachment, 'item:', item.name, 'value:', value)}
+                    {(() => { console.log('🔴 Verificando attachment. shouldShow:', shouldShowAttachmentField, 'isMandatory:', isMandatoryAttachment, 'item:', item.name, 'value:', value); return null; })()}
                     {shouldShowAttachmentField && (
                         <div className={`mt-4 p-3 rounded-lg border animate-in fade-in ${isMandatoryAttachment ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
                             <p className={`text-[10px] font-black uppercase mb-2 ${isMandatoryAttachment ? 'text-red-500' : 'text-slate-400'}`}>
@@ -898,7 +902,7 @@ const InspectionItem = ({ item, value, onChange, inspectionId }: {
                                         <input
                                             type="file"
                                             accept="image/*"
-                                            capture="environment"
+                                            capture={(!allowGallery || isMandatoryAttachment) ? "environment" : undefined}
                                             className="hidden"
                                             onChange={(e) => {
                                                 console.log('🟢 INPUT onChange disparado!');

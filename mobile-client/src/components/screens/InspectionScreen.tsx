@@ -285,7 +285,7 @@ const InspectionScreen: React.FC = () => {
                   </p>
 
                   {/* DEBUG: Log item config */}
-                  {console.log('Item:', item.name, 'Type:', item.type, 'Config:', item.config)}
+                  {(() => { console.log('Item:', item.name, 'Type:', item.type, 'Config:', item.config); return null; })()}
 
                   {/* Renderização baseada no TIPO */}
 
@@ -331,7 +331,7 @@ const InspectionScreen: React.FC = () => {
                                 : 'bg-white border-slate-200 text-slate-400'
                                 }`}
                             >
-                              <ThumbsUp size={24} weight={answers[item.id]?.answer === 'Conforme' ? "fill" : "regular"} />
+                              <ThumbsUp size={24} fill={answers[item.id]?.answer === 'Conforme' ? "currentColor" : "none"} />
                             </button>
                             <button
                               onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('Não Conforme') })}
@@ -340,7 +340,7 @@ const InspectionScreen: React.FC = () => {
                                 : 'bg-white border-slate-200 text-slate-400'
                                 }`}
                             >
-                              <ThumbsDown size={24} weight={answers[item.id]?.answer === 'Não Conforme' ? "fill" : "regular"} />
+                              <ThumbsDown size={24} fill={answers[item.id]?.answer === 'Não Conforme' ? "currentColor" : "none"} />
                             </button>
                             <button
                               onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('N/A') })}
@@ -650,7 +650,7 @@ const InspectionScreen: React.FC = () => {
                           <input
                             type="file"
                             accept={item.config?.allow_photo ? "image/*" : "*/*"}
-                            capture={item.config?.allow_photo ? "environment" : undefined}
+                            capture={(!template?.settings?.allow_gallery || isMandatory) ? "environment" : undefined}
                             className="hidden"
                             onChange={async (e) => {
                               const file = e.target.files?.[0];

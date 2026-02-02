@@ -13,6 +13,10 @@ export interface PendingInspection {
     // Metadata para exibição
     vehiclePlate?: string;
     templateName?: string;
+    // Analysis workflow fields
+    analysis_status?: string | null;
+    analysis_current_step?: number;
+    analysis_total_steps?: number | null;
 }
 
 export interface DraftInspection {
