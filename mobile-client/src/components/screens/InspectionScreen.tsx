@@ -115,8 +115,8 @@ const InspectionScreen: React.FC = () => {
         const conditionMet =
           requirePhotoOn.includes('always') ||
           (item.mandatoryAttachment && requirePhotoOn.length === 0) ||
-          (val === 'Não Conforme' && requirePhotoOn.includes('nao')) ||
-          (val === 'Não Conforme' && requirePhotoOn.includes('ruim')) ||
+          ((val === 'Não Conforme' || val === 'Não' || val === 'Ruim' || val === 'Triste') && (requirePhotoOn.includes('nao') || requirePhotoOn.includes('ruim'))) ||
+          ((val === 'Conforme' || val === 'Sim' || val === 'Bom' || val === 'Feliz') && (requirePhotoOn.includes('sim') || requirePhotoOn.includes('bom'))) ||
           (val === 'Regular' && requirePhotoOn.includes('regular'));
 
         if (conditionMet) {
@@ -579,17 +579,11 @@ const InspectionScreen: React.FC = () => {
                     const isMandatory =
                       item.mandatory_attachment ||
                       requirePhotoOn.includes('always') ||
-                      // N/S mode: Sim/Não
-                      (val === 'Sim' && requirePhotoOn.includes('sim')) ||
-                      (val === 'Não' && requirePhotoOn.includes('nao')) ||
-                      // Text mode: Conforme/Não Conforme
-                      (val === 'Conforme' && requirePhotoOn.includes('bom')) ||
-                      (val === 'Conforme' && requirePhotoOn.includes('sim')) ||
-                      (val === 'Não Conforme' && requirePhotoOn.includes('nao')) ||
-                      (val === 'Não Conforme' && requirePhotoOn.includes('ruim')) ||
-                      // Emoji mode: Bom/Regular/Ruim
-                      (val === 'Bom' && requirePhotoOn.includes('bom')) ||
-                      (val === 'Ruim' && requirePhotoOn.includes('ruim')) ||
+                      // Map all possible variations of "Bad" response
+                      ((val === 'Não' || val === 'Não Conforme' || val === 'Ruim' || val === 'Triste') && (requirePhotoOn.includes('nao') || requirePhotoOn.includes('ruim'))) ||
+                      // Map all possible variations of "Good" response
+                      ((val === 'Sim' || val === 'Conforme' || val === 'Bom' || val === 'Feliz') && (requirePhotoOn.includes('sim') || requirePhotoOn.includes('bom'))) ||
+                      // Regular
                       (val === 'Regular' && requirePhotoOn.includes('regular'));
 
                     // Show field if: allow_photo OR mandatory condition met

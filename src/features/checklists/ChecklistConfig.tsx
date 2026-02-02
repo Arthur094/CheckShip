@@ -2032,7 +2032,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
           </button>
         </div>
         <div className="flex items-center gap-4">
-          {isLocked ? (
+          {status === 'published' ? (
             <button
               onClick={handleCreateVersion}
               className="px-10 py-2.5 bg-blue-900 text-white rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-800 shadow-md transition-all active:scale-95 flex items-center gap-2"

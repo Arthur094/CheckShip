@@ -563,17 +563,20 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
         // 2. Conditional rules (new)
         const requirePhotoOn = item.config?.require_photo_on;
         if (requirePhotoOn && Array.isArray(requirePhotoOn) && requirePhotoOn.length > 0) {
+            // Normalize value for comparison
+            const val = typeof value === 'string' ? value.toLowerCase() : value;
+
             // N/S mode: Sim/Não
-            if (value === 'conforme' && (requirePhotoOn.includes('sim') || requirePhotoOn.includes('bom'))) return true;
-            if (value === 'nao_conforme' && (requirePhotoOn.includes('nao') || requirePhotoOn.includes('ruim'))) return true;
+            if (val === 'conforme' && (requirePhotoOn.includes('sim') || requirePhotoOn.includes('bom'))) return true;
+            if (val === 'nao_conforme' && (requirePhotoOn.includes('nao') || requirePhotoOn.includes('ruim'))) return true;
 
             // Emoji mode: Bom/Regular/Ruim
-            if (value === 'bom' && requirePhotoOn.includes('bom')) return true;
-            if (value === 'regular' && requirePhotoOn.includes('regular')) return true;
-            if (value === 'ruim' && requirePhotoOn.includes('ruim')) return true;
+            if (val === 'bom' && requirePhotoOn.includes('bom')) return true;
+            if (val === 'regular' && requirePhotoOn.includes('regular')) return true;
+            if (val === 'ruim' && requirePhotoOn.includes('ruim')) return true;
 
             // Direct match fallback
-            return requirePhotoOn.includes(value);
+            return requirePhotoOn.includes(val);
         }
 
         return false;
