@@ -511,6 +511,19 @@ const InspectionDetails: React.FC = () => {
                     {/* PRINTED REPORT HEADER */}
                     {/* PRINTED REPORT HEADER - MINIMALIST A4 STYLE */}
                     <div className="pb-6 mb-6 border-b-2 border-slate-900/10">
+                        {/* CheckShip Logo */}
+                        <div className="flex items-center gap-3 mb-6">
+                            {/* Logo Icon */}
+                            <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center shrink-0">
+                                <span className="text-white font-black text-lg">CS</span>
+                            </div>
+                            {/* Logo Text */}
+                            <div className="flex flex-col">
+                                <span className="text-sm font-black text-slate-900 uppercase tracking-tight leading-none">CHECKSHIP</span>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Fleet Management</span>
+                            </div>
+                        </div>
+
                         <div className="flex items-start justify-between mb-8">
                             <div>
                                 <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-1">{inspection.template?.name || 'Relatório de Inspeção'}</h1>
