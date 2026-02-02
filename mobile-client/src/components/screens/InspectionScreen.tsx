@@ -605,12 +605,6 @@ const InspectionScreen: React.FC = () => {
                           }`}>
                           <Camera className={
                             (() => {
-                              const val = answers[item.id]?.answer;
-                              const isMandatory =
-                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('nao')) ||
-                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('ruim')) ||
-                                (val === 'Regular' && item.config?.require_photo_on?.includes('regular'));
-
                               if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
                                 return 'text-red-500';
                               }
@@ -618,25 +612,13 @@ const InspectionScreen: React.FC = () => {
                             })()
                           } size={24} />
                           <span className={`text-sm font-medium ${(() => {
-                            const val = answers[item.id]?.answer;
-                            const isMandatory =
-                              (val === 'Não Conforme' && item.config?.require_photo_on?.includes('nao')) ||
-                              (val === 'Não Conforme' && item.config?.require_photo_on?.includes('ruim')) ||
-                              (val === 'Regular' && item.config?.require_photo_on?.includes('regular'));
-
-                            if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
-                              return 'text-red-600';
-                            }
-                            return 'text-blue-900';
-                          })()
+                              if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
+                                return 'text-red-600';
+                              }
+                              return 'text-blue-900';
+                            })()
                             }`}>
                             {(() => {
-                              const val = answers[item.id]?.answer;
-                              const isMandatory =
-                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('nao')) ||
-                                (val === 'Não Conforme' && item.config?.require_photo_on?.includes('ruim')) ||
-                                (val === 'Regular' && item.config?.require_photo_on?.includes('regular'));
-
                               if (isMandatory) return 'Foto Obrigatória!';
                               return item.config?.allow_photo ? 'Tirar Foto' : 'Adicionar Anexo';
                             })()}
