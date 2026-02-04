@@ -55,16 +55,44 @@ const TrailerForm: React.FC<TrailerFormProps> = ({ data, onChange }) => {
                             Tipo de Implemento
                         </label>
                         <select
-                            value={data.trailer_type || 'CARRETA'}
+                            value={data.trailer_type || 'SEMIREBOQUE'}
                             onChange={(e) => onChange('trailer_type', e.target.value)}
                             className="w-full bg-white border border-slate-200 px-4 py-3 rounded-lg text-sm font-bold tracking-wide text-slate-700 focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all"
                         >
-                            <option value="CARRETA">CARRETA / SEMIREBOQUE</option>
+                            <option value="SEMIREBOQUE">SEMIREBOQUE</option>
+                            <option value="CARRETA I">CARRETA I</option>
+                            <option value="CARRETA II">CARRETA II</option>
                             <option value="DOLLY">DOLLY</option>
                         </select>
                         <p className="mt-2 text-[10px] text-slate-400 font-medium italic">
                             Define a lista de documentos obrigatórios.
                         </p>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                            Chassi
+                        </label>
+                        <input
+                            type="text"
+                            value={data.chassi || ''}
+                            onChange={(e) => onChange('chassi', e.target.value.toUpperCase())}
+                            className="w-full bg-white border border-slate-200 px-4 py-3 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all placeholder:text-slate-400"
+                            placeholder="Número do chassi"
+                        />
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                            RENAVAM
+                        </label>
+                        <input
+                            type="text"
+                            value={data.renavam || ''}
+                            onChange={(e) => onChange('renavam', e.target.value)}
+                            className="w-full bg-white border border-slate-200 px-4 py-3 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900 transition-all placeholder:text-slate-400"
+                            placeholder="Número do RENAVAM"
+                        />
                     </div>
 
 

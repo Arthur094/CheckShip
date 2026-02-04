@@ -22,6 +22,8 @@ const TrailerConfig: React.FC<TrailerConfigProps> = ({ onBack, initialData }) =>
         plate: initialData?.plate || '',
         active: initialData?.active ?? true,
         trailer_type: initialData?.trailer_type || 'CARRETA',
+        chassi: initialData?.chassi || '',
+        renavam: initialData?.renavam || '',
         civ_date: initialData?.civ_date || null,
         civ_expiry: initialData?.civ_expiry || null,
         civ_file_url: initialData?.civ_file_url || null,

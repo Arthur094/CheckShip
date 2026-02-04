@@ -57,6 +57,9 @@ export interface Trailer {
   active: boolean;
   company_id: string;
 
+  chassi?: string | null;
+  renavam?: string | null;
+
   civ_date?: string | null;
   civ_expiry?: string | null;
   civ_file_url?: string | null;
