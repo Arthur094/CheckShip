@@ -107,6 +107,7 @@ export interface ChecklistItemConfig {
   require_photo_on?: string[]; // Valores que exigem foto obrigatória (ex: ['ruim', 'nao'])
   selection_type?: 'single' | 'multiple';
   selection_options?: string[];
+  photo_required_options?: string[]; // Opções de seleção que requerem foto obrigatória
   min?: number;
   max?: number;
 }

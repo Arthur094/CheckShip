@@ -529,9 +529,13 @@ const InspectionDetails: React.FC = () => {
                                 <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-1">{inspection.template?.name || 'Relatório de Inspeção'}</h1>
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Protocolo: {inspection.code || inspection.id}</p>
                             </div>
-                            <div className={`px-4 py-1 rounded-md text-[10px] font-black border uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                            <div className={`px-4 py-1 rounded-md text-[10px] font-black border uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                    inspection.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                        'bg-yellow-50 text-yellow-700 border-yellow-200'
                                 }`}>
-                                {inspection.status === 'completed' ? 'Concluído' : 'Em Andamento'}
+                                {inspection.status === 'completed' ? 'Concluído' :
+                                    inspection.status === 'rejected' ? 'Reprovado' :
+                                        'Em Andamento'}
                             </div>
                         </div>
 

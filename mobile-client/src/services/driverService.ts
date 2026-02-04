@@ -111,68 +111,42 @@ export const driverService = {
             return templates || [];
 
         } catch (error) {
-            console.log('📴 Offline: filtrando templates por tipo de veículo do cache');
+            console.log('📴 Offline ou erro ao buscar templates - usando cache');
 
-            // Get vehicle from cache to find its type
+            // FALLBACK CACHE: Busca do cache local
             const vehicles = cacheService.getVehicles();
             const vehicle = vehicles.find((v: any) => v.id === vehicleId);
 
             if (!vehicle?.vehicle_type_id) {
-                console.log('⚠️ Veículo não encontrado no cache ou sem tipo');
-                return [];
+                console.log('⚠️ Veículo não encontrado no cache, retornando todos os templates');
+                return cacheService.getTemplates(); // Retorna todos se não encontrar veículo
             }
 
-            // Get assignments and templates from cache
-            const assignments = cacheService.getTemplateAssignments(); // Now contains group_id mapping
-            const allTemplates = cacheService.getTemplates(); // Now contains only published templates
+            const assignments = cacheService.getTemplateAssignments();
+            const allTemplates = cacheService.getTemplates();
 
-            // Filter: get template IDs for this vehicle TYPE
-            // The cache already stores the "resolved" fresh templates, so we just need to match the group logic
-            // But wait, the assignments in cache might still point to old IDs if we don't update them.
-            // Actually, cacheService.downloadAllData handles simple fetching.
-            // Let's assume cacheService stores the *result* of the published fetch.
+            // Filtra templates pelo vehicle_type_id
+            const relevantAssignments = assignments.filter(
+                (a: any) => a.vehicle_type_id === vehicle.vehicle_type_id
+            );
 
-            // To support offline properly with the new logic, we need to replicate the association logic.
-            // For now, let's look at what we cache.
-            // We cache:
-            // 1. Vehicles
-            // 2. Template Assignments (raw table)
-            // 3. Templates (the final list of published templates)
+            if (relevantAssignments.length === 0) {
+                console.log('⚠️ Nenhum assignment encontrado, retornando todos os templates');
+                return allTemplates; // Melhor retornar todos que nada
+            }
 
-            // If we have the published templates in cache, we just need to know which ones match the vehicle type.
-            // The link is: Vehicle Type -> Assignment -> Template ID (Old) -> Group ID -> Template ID (New)
+            const assignedTemplateIds = relevantAssignments.map((a: any) => a.checklist_template_id);
 
-            // Complexity: The assignment points to ID_OLD. The template in cache is ID_NEW.
-            // They share GROUP_ID.
-            // So we need to match by GROUP_ID.
+            // Tenta match direto por ID
+            const matchedTemplates = allTemplates.filter((t: any) => assignedTemplateIds.includes(t.id));
 
-            // 1. Find assigned Template IDs for this Vehicle Type
-            const assignedTemplateIds = assignments
-                .filter((a: any) => a.vehicle_type_id === vehicle.vehicle_type_id)
-                .map((a: any) => a.checklist_template_id);
+            if (matchedTemplates.length > 0) {
+                console.log('✅ Templates encontrados no cache:', matchedTemplates.length);
+                return matchedTemplates;
+            }
 
-            // 2. We need to know the GROUP_IDs of these assigned IDs.
-            // This is tricky if we don't cache the old templates or a mapping.
-            // Ideally, we should cache a "VehicleType -> GroupID" mapping or similar.
-            // OR, simply cache the "Resolved Templates per Vehicle Type" but that might be duplicate data.
-
-            // Let's rely on the fact that `cacheService.getTemplates()` returns the list of RELEVANT templates.
-            // If the user only has one vehicle type, it's easy. If multiple, we need to filter.
-
-            // OPTION: We can filter by group_id if we have it.
-            // But we only have ID_NEW in `allTemplates`. We don't know the ID_OLD to link to group_id easily without extra data.
-
-            // Temporary Fix for Offline: Return ALL cached templates.
-            // Usually a driver has only one profile/context or few templates.
-            // Filtering by assignments is safer though.
-
-            // Let's try to find if any of the cached templates match the assigned IDs directly (if no version change).
-            // Any match?
-            const updates = allTemplates.filter((t: any) => assignedTemplateIds.includes(t.id));
-            if (updates.length > 0) return updates; // Direct match
-
-            // Fallback: Return all cached templates. 
-            // This is better than returning nothing. The user likely needs them.
+            // Fallback final: retorna todos os templates do cache
+            console.log('📦 Retornando todos os templates do cache como fallback');
             return allTemplates;
         }
     },

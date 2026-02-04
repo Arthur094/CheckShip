@@ -169,6 +169,7 @@ interface AreaItem {
     options?: string[]; // Legacy fallback
     input_style?: 'default' | 'thumbs' | 'smile_3' | 'smile_5' | 'happy_sad' | 'n_s';
     require_photo_on?: string[];
+    photo_required_options?: string[];
   };
 }
 
@@ -359,7 +360,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
               allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
               input_style: dbItem.config?.input_style || 'default',
-              require_photo_on: dbItem.config?.require_photo_on || []
+              require_photo_on: dbItem.config?.require_photo_on || [],
+              photo_required_options: dbItem.config?.photo_required_options || []
             }
           })),
           subAreas: (dbArea.sub_areas || []).map((dbSub: any) => ({
@@ -380,7 +382,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
                 allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
                 input_style: dbItem.config?.input_style || 'default',
-                require_photo_on: dbItem.config?.require_photo_on || []
+                require_photo_on: dbItem.config?.require_photo_on || [],
+                photo_required_options: dbItem.config?.photo_required_options || []
               }
             }))
           }))
@@ -511,7 +514,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 allow_photo: item.mandatoryAttachment,
                 allow_attachment: item.mandatoryAttachment,
                 input_style: (item.config as any)?.input_style,
-                require_photo_on: (item.config as any)?.require_photo_on
+                require_photo_on: (item.config as any)?.require_photo_on,
+                photo_required_options: (item.config as any)?.photo_required_options
               }
             })) || [],
             sub_areas: area.subAreas?.map(sub => ({
@@ -533,7 +537,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   allow_photo: sitem.mandatoryAttachment,
                   allow_attachment: sitem.mandatoryAttachment,
                   input_style: (sitem.config as any)?.input_style,
-                  require_photo_on: (sitem.config as any)?.require_photo_on
+                  require_photo_on: (sitem.config as any)?.require_photo_on,
+                  photo_required_options: (sitem.config as any)?.photo_required_options
                 }
               })) || []
             })) || []
@@ -792,6 +797,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
   // New configuration states
   const [inputStyle, setInputStyle] = useState<'smile_5' | 'smile_3' | 'thumbs' | 'default'>('default');
   const [requirePhotoOn, setRequirePhotoOn] = useState<string[]>([]);
+  const [photoRequiredOptions, setPhotoRequiredOptions] = useState<string[]>([]);
 
   const resetItemForm = () => {
     setItemName('');
@@ -800,6 +806,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     setScaleIdx(0);
     setInputStyle('default');
     setRequirePhotoOn([]);
+    setPhotoRequiredOptions([]);
     setRegistryOptions([]);
     setNumericOption('');
     setSelectionType('single');
@@ -842,6 +849,11 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         // Load new fields
         setInputStyle((item.config as any).input_style || 'default');
         setRequirePhotoOn((item.config as any).require_photo_on || []);
+
+        // FIX: Support both camelCase and snake_case for photo_required_options
+        const photoReqOpts = (item.config as any).photo_required_options || (item.config as any).photoRequiredOptions || [];
+        console.log('🔍 Loading photo_required_options:', photoReqOpts, 'from config:', item.config); // DEBUG
+        setPhotoRequiredOptions(photoReqOpts);
 
         // FIX: Read selection_type from both camelCase (local state) and snake_case (database)
         const selType = item.config.selectionType || (item.config as any).selection_type || 'single';
@@ -902,9 +914,12 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         selectionOptions: finalSelectionOptions,
         hint: hintText,
         input_style: itemType === 'Avaliativo' ? inputStyle : undefined,
-        require_photo_on: itemType === 'Avaliativo' ? requirePhotoOn : undefined
+        require_photo_on: itemType === 'Avaliativo' ? requirePhotoOn : undefined,
+        photo_required_options: itemType === 'Lista de Seleção' ? photoRequiredOptions : undefined
       }
     };
+
+    console.log('💾 Saving item with photo_required_options:', photoRequiredOptions, 'newItem.config:', newItem.config); // DEBUG
 
     const newAreas = [...areas];
     let targetItems: AreaItem[];
@@ -1857,7 +1872,27 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                     <div key={idx} className="flex items-center gap-2 animate-in slide-in-from-left-2">
                       <div className={`w-4 h-4 rounded border border-slate-300 ${selectionType === 'single' ? 'rounded-full' : 'rounded'}`}></div>
                       <span className="text-sm text-slate-700 bg-slate-50 px-3 py-1.5 rounded flex-1 border border-slate-100">{opt}</span>
-                      <button onClick={() => setSelectionOptions(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
+
+                      {/* Botão de câmera para foto obrigatória */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (photoRequiredOptions.includes(opt)) {
+                            setPhotoRequiredOptions(photoRequiredOptions.filter(o => o !== opt));
+                          } else {
+                            setPhotoRequiredOptions([...photoRequiredOptions, opt]);
+                          }
+                        }}
+                        className={`p-1.5 rounded transition-all ${photoRequiredOptions.includes(opt)
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'bg-slate-200 text-slate-400 hover:bg-slate-300'
+                          }`}
+                        title={photoRequiredOptions.includes(opt) ? 'Foto obrigatória ativa' : 'Clique para obrigar foto'}
+                      >
+                        <Camera size={14} />
+                      </button>
+
+                      <button type="button" onClick={() => setSelectionOptions(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600"><X size={14} /></button>
                     </div>
                   ))}
 

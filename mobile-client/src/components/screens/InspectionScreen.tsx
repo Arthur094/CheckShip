@@ -128,6 +128,37 @@ const InspectionScreen: React.FC = () => {
             pendingItemName = item.name || 'Item sem nome';
           }
         }
+
+        // ⬅️ NOVO: Validar foto obrigatória em opções de seleção
+        if (item.type === 'Lista de Seleção') {
+          const photoRequiredOptions = config.photo_required_options || [];
+          const selectedValue = val;
+
+          // Seleção única
+          if ((config.selectionType || config.selection_type) !== 'multiple') {
+            if (selectedValue && photoRequiredOptions.includes(selectedValue)) {
+              const hasPhoto = answers[item.id]?.imageUrl || answers[item.id + '_file'];
+              if (!hasPhoto) {
+                pendingPhotos = true;
+                pendingItemName = `${item.name} (opção: ${selectedValue})`;
+              }
+            }
+          }
+          // Seleção múltipla
+          else {
+            if (Array.isArray(selectedValue)) {
+              const requiresPhoto = selectedValue.some(opt => photoRequiredOptions.includes(opt));
+              if (requiresPhoto) {
+                const hasPhoto = answers[item.id]?.imageUrl || answers[item.id + '_file'];
+                if (!hasPhoto) {
+                  pendingPhotos = true;
+                  const requiredOpts = selectedValue.filter(opt => photoRequiredOptions.includes(opt));
+                  pendingItemName = `${item.name} (opções: ${requiredOpts.join(', ')})`;
+                }
+              }
+            }
+          }
+        }
       });
     });
 
@@ -206,9 +237,9 @@ const InspectionScreen: React.FC = () => {
 
         console.log('Salvo online:', data);
         if (requiresAnalysis) {
-          alert('✅ Inspeção finalizada! Aguardando análise do gestor.');
+          alert('✅ Checklist Concluído e Enviado com Sucesso!\n\nAguardando análise do gestor.');
         } else {
-          alert('✅ Inspeção finalizada e sincronizada!');
+          alert('✅ Checklist Concluído e Enviado com Sucesso!');
         }
         navigate('/');
       } catch (onlineError: any) {
@@ -247,7 +278,7 @@ const InspectionScreen: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Erro:', error);
-      alert('Erro ao finalizar: ' + error.message);
+      alert('Ops! Houve um problema ao enviar, tente sincronizar em outro momento.');
     } finally {
       setSaving(false);
     }
@@ -524,16 +555,18 @@ const InspectionScreen: React.FC = () => {
 
                   {/* LISTA DE SELEÇÃO - SELEÇÃO ÚNICA */}
                   {item.type === 'Lista de Seleção' && (item.config?.selectionType || (item.config as any)?.selection_type) !== 'multiple' && (
-                    <select
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
-                      onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
-                      value={answers[item.id]?.answer || ''}
-                    >
-                      <option value="">Selecione uma opção...</option>
-                      {(item.config?.selectionOptions || (item.config as any)?.selection_options || []).map((opt: any, idx: number) => (
-                        <option key={idx} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-900 transition-all"
+                        onChange={(e) => setAnswers({ ...answers, [item.id]: createAnswer(e.target.value) })}
+                        value={answers[item.id]?.answer || ''}
+                      >
+                        <option value="">Selecione uma opção...</option>
+                        {(item.config?.selectionOptions || (item.config as any)?.selection_options || []).map((opt: any, idx: number) => (
+                          <option key={idx} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </>
                   )}
 
                   {/* LISTA DE SELEÇÃO - SELEÇÃO MÚLTIPLA */}
@@ -542,6 +575,8 @@ const InspectionScreen: React.FC = () => {
                       {(item.config?.selectionOptions || (item.config as any)?.selection_options || []).map((opt: any, idx: number) => {
                         const currentAnswers = answers[item.id]?.answer || [];
                         const isChecked = Array.isArray(currentAnswers) && currentAnswers.includes(opt);
+                        const photoRequiredOptions = (item.config as any)?.photo_required_options || [];
+                        const requiresPhoto = photoRequiredOptions.includes(opt);
 
                         return (
                           <label key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all">
@@ -558,7 +593,10 @@ const InspectionScreen: React.FC = () => {
                               }}
                               className="w-5 h-5 text-blue-900 border-slate-300 rounded focus:ring-2 focus:ring-blue-100"
                             />
-                            <span className="text-sm text-slate-700">{opt}</span>
+                            <span className="text-sm text-slate-700 flex-1">{opt}</span>
+                            {requiresPhoto && (
+                              <Camera size={14} className="text-red-500" />
+                            )}
                           </label>
                         );
                       })}
@@ -612,11 +650,11 @@ const InspectionScreen: React.FC = () => {
                             })()
                           } size={24} />
                           <span className={`text-sm font-medium ${(() => {
-                              if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
-                                return 'text-red-600';
-                              }
-                              return 'text-blue-900';
-                            })()
+                            if (isMandatory && !answers[item.id]?.imageUrl && !answers[item.id + '_file']) {
+                              return 'text-red-600';
+                            }
+                            return 'text-blue-900';
+                          })()
                             }`}>
                             {(() => {
                               if (isMandatory) return 'Foto Obrigatória!';
@@ -736,10 +774,167 @@ const InspectionScreen: React.FC = () => {
 
                                   if (isOfflineImage) {
                                     alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
-                                  } else {
-                                    alert('Imagem enviada com sucesso!');
+                                  }
+                                  // Imagem processada com sucesso - feedback visual é suficiente
+
+                                } catch (error: any) {
+                                  console.error('Erro crítico ao processar imagem:', error);
+                                  alert('Erro ao processar imagem: ' + error.message);
+                                }
+                              }
+                            }}
+                          />
+                        </label>
+                        {answers[item.id + '_file'] && (
+                          <div className="text-xs text-slate-500 text-center">
+                            📷 {answers[item.id + '_file']}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ⬅️ NOVO: FOTO OBRIGATÓRIA PARA OPÇÕES DE SELEÇÃO */}
+                  {item.type === 'Lista de Seleção' && (() => {
+                    const val = answers[item.id]?.answer;
+                    const config = item.config || {};
+                    const photoRequiredOptions = (config as any)?.photo_required_options || [];
+
+                    let requiresPhoto = false;
+
+                    // Seleção única
+                    if ((config.selectionType || (config as any)?.selection_type) !== 'multiple') {
+                      requiresPhoto = val && photoRequiredOptions.includes(val);
+                    }
+                    // Seleção múltipla
+                    else {
+                      if (Array.isArray(val)) {
+                        requiresPhoto = val.some(opt => photoRequiredOptions.includes(opt));
+                      }
+                    }
+
+                    if (!requiresPhoto) return null;
+
+                    const hasPhoto = answers[item.id]?.imageUrl || answers[item.id + '_file'];
+
+                    return (
+                      <div className="space-y-2 mt-3">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 text-sm font-bold uppercase text-red-500">
+                            <Camera size={16} />
+                            Evidência Obrigatória
+                          </label>
+                        </div>
+                        <label className={`flex items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${!hasPhoto ? 'bg-red-50 border-red-300 hover:bg-red-100' : 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                          }`}>
+                          <Camera className={!hasPhoto ? 'text-red-500' : 'text-blue-900'} size={24} />
+                          <span className={`text-sm font-medium ${!hasPhoto ? 'text-red-600' : 'text-blue-900'}`}>
+                            {!hasPhoto ? 'Foto Obrigatória!' : 'Foto Anexada'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture={!template?.settings?.allow_gallery ? "environment" : undefined}
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const compressImage = (fileToCompress: File): Promise<Blob> => {
+                                    return new Promise((resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.readAsDataURL(fileToCompress);
+                                      reader.onload = (event) => {
+                                        const img = new Image();
+                                        img.src = event.target?.result as string;
+                                        img.onload = () => {
+                                          const canvas = document.createElement('canvas');
+                                          let width = img.width;
+                                          let height = img.height;
+                                          const MAX_WIDTH = 1920;
+                                          const MAX_HEIGHT = 1920;
+
+                                          if (width > height) {
+                                            if (width > MAX_WIDTH) {
+                                              height *= MAX_WIDTH / width;
+                                              width = MAX_WIDTH;
+                                            }
+                                          } else {
+                                            if (height > MAX_HEIGHT) {
+                                              width *= MAX_HEIGHT / height;
+                                              height = MAX_HEIGHT;
+                                            }
+                                          }
+
+                                          canvas.width = width;
+                                          canvas.height = height;
+                                          const ctx = canvas.getContext('2d');
+                                          ctx?.drawImage(img, 0, 0, width, height);
+
+                                          canvas.toBlob((blob) => {
+                                            if (blob) resolve(blob);
+                                            else reject(new Error('Falha na compressão'));
+                                          }, 'image/jpeg', 0.85);
+                                        };
+                                      };
+                                    });
+                                  };
+
+                                  console.log('🔄 Comprimindo imagem...', file.name);
+                                  const compressedBlob = await compressImage(file);
+                                  const fileName = `${vehicleId}_${templateId}_${item.id}_${Date.now()}.jpg`;
+
+                                  const blobToBase64 = (blob: Blob): Promise<string> => {
+                                    return new Promise((resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => resolve(reader.result as string);
+                                      reader.onerror = reject;
+                                      reader.readAsDataURL(blob);
+                                    });
+                                  };
+
+                                  let publicUrl = '';
+                                  let isOfflineImage = false;
+
+                                  try {
+                                    console.log('☁️ Tentando upload online:', fileName);
+                                    const { error: uploadError } = await supabase.storage
+                                      .from('checklist-photos')
+                                      .upload(fileName, compressedBlob, {
+                                        contentType: 'image/jpeg',
+                                        upsert: false
+                                      });
+
+                                    if (uploadError) throw uploadError;
+
+                                    const { data } = supabase.storage
+                                      .from('checklist-photos')
+                                      .getPublicUrl(fileName);
+
+                                    publicUrl = data.publicUrl;
+                                    console.log('✅ Upload Online Sucesso!');
+                                  } catch (error) {
+                                    console.warn('⚠️ Falha no upload (provavelmente offline). Salvando localmente.', error);
+                                    publicUrl = await blobToBase64(compressedBlob);
+                                    isOfflineImage = true;
                                   }
 
+                                  const currentAnswer = answers[item.id] || createAnswer(null);
+                                  setAnswers(prev => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      ...currentAnswer,
+                                      imageUrl: publicUrl,
+                                      isOffline: isOfflineImage,
+                                      fileName: fileName
+                                    },
+                                    [item.id + '_file']: file.name
+                                  }));
+
+                                  if (isOfflineImage) {
+                                    alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
+                                  }
+                                  // Imagem processada com sucesso - feedback visual é suficiente
                                 } catch (error: any) {
                                   console.error('Erro crítico ao processar imagem:', error);
                                   alert('Erro ao processar imagem: ' + error.message);

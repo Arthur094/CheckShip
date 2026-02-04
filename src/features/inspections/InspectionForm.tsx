@@ -195,6 +195,54 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
 
     // Handle complete button click - check if signature required
     const handleCompleteClick = () => {
+        // ⬅️ NOVO: Validar foto obrigatória em opções de seleção
+        if (template?.structure?.areas) {
+            for (const area of template.structure.areas) {
+                // Check items directly in area
+                const allItems = [...(area.items || [])];
+
+                // Add items from subareas
+                if (area.sub_areas) {
+                    for (const subArea of area.sub_areas) {
+                        allItems.push(...(subArea.items || []));
+                    }
+                }
+
+                // Validate each item
+                for (const item of allItems) {
+                    if (item.type === 'Lista de Seleção') {
+                        const photoRequiredOptions = item.config?.photo_required_options || [];
+                        const val = answers[item.id]?.answer;
+
+                        // Seleção única
+                        if (item.config.selection_type === 'single') {
+                            if (val && photoRequiredOptions.includes(val)) {
+                                const hasPhoto = answers[item.id]?.imageUrl;
+                                if (!hasPhoto) {
+                                    alert(`ATENÇÃO: O item "${item.name}" possui uma opção "${val}" que requer evidência fotográfica. Por favor, anexe uma foto antes de finalizar a inspeção.`);
+                                    return;
+                                }
+                            }
+                        }
+                        // Seleção múltipla
+                        else if (item.config.selection_type === 'multiple') {
+                            if (Array.isArray(val)) {
+                                const requiresPhoto = val.some(opt => photoRequiredOptions.includes(opt));
+                                if (requiresPhoto) {
+                                    const hasPhoto = answers[item.id]?.imageUrl;
+                                    if (!hasPhoto) {
+                                        const requiredOpts = val.filter(opt => photoRequiredOptions.includes(opt));
+                                        alert(`ATENÇÃO: O item "${item.name}" possui opções selecionadas (${requiredOpts.join(', ')}) que requerem evidência fotográfica. Por favor, anexe uma foto antes de finalizar a inspeção.`);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // @ts-ignore - require_driver_signature may not be in type yet
         const requiresSignature = template?.settings?.require_driver_signature;
 
@@ -267,8 +315,8 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
 
             if (complete) {
                 const message = template.requires_analysis
-                    ? 'Inspeção finalizada! Enviada para análise.'
-                    : 'Inspeção finalizada com sucesso!';
+                    ? '✅ Checklist Concluído e Enviado com Sucesso!\n\nAguardando análise do gestor.'
+                    : '✅ Checklist Concluído e Enviado com Sucesso!';
                 alert(message);
                 onClose();
             } else {
@@ -276,7 +324,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
             }
         } catch (error: any) {
             console.error('Error saving:', error);
-            alert('Erro ao salvar: ' + error.message);
+            alert('Ops! Houve um problema ao enviar, tente sincronizar em outro momento.');
         } finally {
             setSaving(false);
         }
@@ -537,7 +585,7 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
                 console.log('💾 Salvando URL no answer...');
                 onChange({ imageUrl: publicUrl });
 
-                alert('Imagem enviada com sucesso!');
+                // Imagem enviada com sucesso - feedback visual é suficiente
                 console.log('🎉 Upload completo!');
             } catch (error: any) {
                 console.error('❌ ERRO no upload:', error);
@@ -850,6 +898,9 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
                                                 {opts.map((opt: string, idx: number) => {
                                                     const current = Array.isArray(value) ? value : [];
                                                     const selected = current.includes(opt);
+                                                    const photoRequiredOptions = item.config?.photo_required_options || [];
+                                                    const requiresPhoto = photoRequiredOptions.includes(opt);
+
                                                     return (
                                                         <label key={idx} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
                                                             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selected ? 'bg-blue-900 border-blue-900' : 'border-slate-300 bg-white'}`}>
@@ -864,17 +915,75 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
                                                                     else onChange([...current, opt]);
                                                                 }}
                                                             />
-                                                            <span className={`text-sm font-medium ${selected ? 'text-blue-900' : 'text-slate-600'}`}>{opt}</span>
+                                                            <span className={`text-sm font-medium flex-1 ${selected ? 'text-blue-900' : 'text-slate-600'}`}>{opt}</span>
+                                                            {requiresPhoto && (
+                                                                <Camera size={14} className="text-red-500" />
+                                                            )}
                                                         </label>
                                                     );
-                                                })}
-                                            </div>
+                                                })}</div>
                                         )}
                                     </>
                                 );
                             })()}
                         </div>
                     )}
+
+                    {/* ⬅️ NOVO: FOTO OBRIGATÓRIA PARA OPÇÕES DE SELEÇÃO */}
+                    {item.type === 'Lista de Seleção' && (() => {
+                        const photoRequiredOptions = item.config?.photo_required_options || [];
+                        let requiresPhoto = false;
+
+                        // Seleção única
+                        if (item.config.selection_type === 'single') {
+                            requiresPhoto = value && photoRequiredOptions.includes(value);
+                        }
+                        // Seleção múltipla
+                        else if (item.config.selection_type === 'multiple') {
+                            if (Array.isArray(value)) {
+                                requiresPhoto = value.some(opt => photoRequiredOptions.includes(opt));
+                            }
+                        }
+
+                        if (!requiresPhoto) return null;
+
+                        return (
+                            <div className="mt-4 p-3 rounded-lg border animate-in fade-in bg-red-50 border-red-200">
+                                <p className="text-[10px] font-black uppercase mb-2 text-red-500">
+                                    Evidência Obrigatória
+                                </p>
+
+                                {mediaPreview ? (
+                                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-slate-200 group">
+                                        <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={() => setMediaPreview(null)}
+                                            className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                        <div className="absolute bottom-0 inset-x-0 bg-green-500 text-white text-[10px] font-bold text-center py-0.5">
+                                            ANEXADO
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <label className="cursor-pointer bg-white border-2 border-dashed border-red-300 hover:border-red-400 hover:bg-red-50 text-red-400 hover:text-red-500 rounded-lg p-4 flex flex-col items-center gap-1 transition-all w-24 h-24 justify-center">
+                                            <Camera size={20} />
+                                            <span className="text-[10px] font-bold">Foto</span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                capture={!allowGallery ? "environment" : undefined}
+                                                className="hidden"
+                                                onChange={handleFileChange}
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* --- MEDIA ATTACHMENTS (STRICT RULE) --- */}
                     {(() => { console.log('🔴 Verificando attachment. shouldShow:', shouldShowAttachmentField, 'isMandatory:', isMandatoryAttachment, 'item:', item.name, 'value:', value); return null; })()}

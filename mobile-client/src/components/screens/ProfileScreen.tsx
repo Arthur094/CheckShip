@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import BottomNav from '../BottomNav';
 import { supabase } from '../../lib/supabase';
+import { cacheService } from '../../services/cacheService';
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -23,8 +24,17 @@ const ProfileScreen: React.FC = () => {
 
         if (error) throw error;
         setUserProfile(data);
+        // Atualiza cache se conseguiu buscar online
+        if (data) {
+          localStorage.setItem('checkship_user_profile', JSON.stringify(data));
+        }
       } catch (error) {
-        console.error('Erro ao carregar perfil:', error);
+        console.error('📴 Erro ao carregar perfil online, usando cache:', error);
+        // FALLBACK: Busca do cache
+        const cachedProfile = cacheService.getUserProfile();
+        if (cachedProfile) {
+          setUserProfile(cachedProfile);
+        }
       } finally {
         setLoading(false);
       }
