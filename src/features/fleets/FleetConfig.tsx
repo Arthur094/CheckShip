@@ -154,7 +154,7 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
             case 'checklists':
                 return <FleetChecklists vehicleId={formData.id} onEnsureExists={() => performSave(true)} />;
             case 'documents':
-                return <DocumentTab entityType="vehicle" entityId={formData.id} requiredDocs={['CRLV', 'CIV', 'CCT', 'AET_FEDERAL', 'AET_ESTADUAL']} onEnsureExists={() => performSave(true)} />;
+                return <DocumentTab entityType="vehicle" entityId={formData.id} requiredDocs={['CRLV', 'CIV', 'CIPP', 'CVT', 'CCT', 'AET_FEDERAL', 'AET_ESTADUAL']} onEnsureExists={() => performSave(true)} />;
             default:
                 return <FleetForm data={formData} onChange={handleFieldChange} />;
         }
