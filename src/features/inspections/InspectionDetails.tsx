@@ -20,7 +20,7 @@ const InspectionDetails: React.FC = () => {
     const [rejectReason, setRejectReason] = useState('');
     const [processing, setProcessing] = useState(false);
     const [docs, setDocs] = useState<any[]>([]);
-    const [trailer, setTrailer] = useState<any>(null);
+    const [trailers, setTrailers] = useState<any[]>([]);
 
     // Analyst Signature States
     const [showAnalystSignatureModal, setShowAnalystSignatureModal] = useState(false);
@@ -59,7 +59,10 @@ const InspectionDetails: React.FC = () => {
                   user:profiles!inspector_id (*),
                   vehicle:vehicles!vehicle_id (
                     *,
-                    vehicle_types (*)
+                    vehicle_types (*),
+                    trailer_id_1,
+                    trailer_id_2,
+                    trailer_id_3
                   )
                 `)
                 .eq('id', id)
@@ -89,9 +92,17 @@ const InspectionDetails: React.FC = () => {
                 setActiveAreaId(tmplStructure.areas[0].id);
             }
 
-            // 3. Fetch Documentation for Driver, Vehicle, Trailer
+            // 3. Fetch Documentation for Driver, Vehicle, Trailers
+            const trailerIds = [
+                inspData.vehicle?.trailer_id_1,
+                inspData.vehicle?.trailer_id_2,
+                inspData.vehicle?.trailer_id_3
+            ].filter(Boolean);
+
             const docFilters = [`profile_id.eq.${inspData.inspector_id}`, `vehicle_id.eq.${inspData.vehicle_id}`];
-            if (inspData.vehicle?.trailer_id) docFilters.push(`trailer_id.eq.${inspData.vehicle.trailer_id}`);
+            trailerIds.forEach(trailerId => {
+                docFilters.push(`trailer_id.eq.${trailerId}`);
+            });
 
             const { data: docData } = await supabase
                 .from('management_documents')
@@ -100,14 +111,20 @@ const InspectionDetails: React.FC = () => {
 
             setDocs(docData || []);
 
-            // 4. Fetch Trailer Plate if needed
-            if (inspData.vehicle?.trailer_id) {
+            // 4. Fetch Trailer Plates if any are linked
+            if (trailerIds.length > 0) {
                 const { data: trlData } = await supabase
                     .from('trailers')
-                    .select('plate')
-                    .eq('id', inspData.vehicle.trailer_id)
-                    .single();
-                setTrailer(trlData);
+                    .select('id, plate')
+                    .in('id', trailerIds)
+                    .order('plate');
+
+                // Order trailers by their slot position
+                const orderedTrailers = trailerIds
+                    .map(id => trlData?.find(t => t.id === id))
+                    .filter(Boolean);
+
+                setTrailers(orderedTrailers);
             }
 
         } catch (error) {
@@ -530,8 +547,8 @@ const InspectionDetails: React.FC = () => {
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Protocolo: {inspection.code || inspection.id}</p>
                             </div>
                             <div className={`px-4 py-1 rounded-md text-[10px] font-black border uppercase tracking-widest ${inspection.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                                    inspection.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                                        'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                inspection.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                    'bg-yellow-50 text-yellow-700 border-yellow-200'
                                 }`}>
                                 {inspection.status === 'completed' ? 'Concluído' :
                                     inspection.status === 'rejected' ? 'Reprovado' :
@@ -551,8 +568,8 @@ const InspectionDetails: React.FC = () => {
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 font-mono">VEÍCULO / PLACA</p>
                                 <p className="text-xs font-bold text-slate-700 uppercase">
                                     {inspection.vehicle?.plate || 'N/A'}
-                                    {trailer?.plate && <span className="text-slate-300 mx-2 text-[10px] font-medium">•</span>}
-                                    {trailer?.plate && <span className="text-slate-500">{trailer.plate}</span>}
+                                    {trailers.length > 0 && <span className="text-slate-300 mx-2 text-[10px] font-medium">+</span>}
+                                    {trailers.length > 0 && <span className="text-slate-500">{trailers.map(t => t.plate).join(' + ')}</span>}
                                 </p>
                                 <p className="text-[10px] text-slate-400 font-medium uppercase">{inspection.vehicle?.model}</p>
                             </div>
@@ -596,7 +613,7 @@ const InspectionDetails: React.FC = () => {
                                     <div key={dIdx} className="flex items-center justify-between group">
                                         <div className="flex flex-col">
                                             <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter mb-0.5">
-                                                {doc.profile_id ? 'Motorista' : doc.vehicle_id ? (inspection.vehicle?.plate || 'Veículo') : (trailer?.plate || 'Carreta')}
+                                                {doc.profile_id ? 'Motorista' : doc.vehicle_id ? (inspection.vehicle?.plate || 'Veículo') : (trailers.find(t => t.id === doc.trailer_id)?.plate || 'Carreta')}
                                             </span>
                                             <span className="text-[10px] font-bold text-slate-600 uppercase leading-none">{doc.document_type.replace(/_/g, ' ')}</span>
                                         </div>

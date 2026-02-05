@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+﻿import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../BottomNav';
 import { useAuth } from '../../App';
-import { driverService } from '../../services/driverService';
+import { cacheService } from '../../services/cacheService';
 import { localStorageService } from '../../services/localStorageService';
 import { supabase } from '../../lib/supabase';
-import { cacheService } from '../../services/cacheService';
 
 type Tab = 'synced' | 'pending';
 
@@ -16,7 +15,22 @@ const CompletedScreen: React.FC = () => {
   const [completedItems, setCompletedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Load last sync timestamp
   useEffect(() => {
@@ -28,8 +42,9 @@ const CompletedScreen: React.FC = () => {
     if (!session?.user?.id || loading) return;
     setLoading(true);
     try {
-      const data = await driverService.getCompletedInspections(session.user.id);
-      setCompletedItems(data || []);
+      // Get completed inspections from cache
+      const synced = cacheService.getCompletedInspections() || [];
+      setCompletedItems(synced);
     } catch (error) {
       console.error('Erro ao carregar inspeções concluídas:', error);
     } finally {
@@ -89,7 +104,9 @@ const CompletedScreen: React.FC = () => {
 
   const handleSyncAll = async () => {
     const pending = localStorageService.getAllPending();
-    if (pending.length === 0) return;
+    if (pending.length === 0 || isSyncing) return;
+
+    setIsSyncing(true);
 
     let synced = 0;
     let failed = 0;
@@ -117,6 +134,8 @@ const CompletedScreen: React.FC = () => {
         failed++;
       }
     }
+
+    setIsSyncing(false);
 
     alert(`✅ ${synced} sincronizadas${failed > 0 ? `, ${failed} falharam` : ''}!`);
     loadCompletedInspections();
@@ -158,11 +177,13 @@ const CompletedScreen: React.FC = () => {
         </div>
         <button
           onClick={handleCacheSync}
-          disabled={syncing}
+          disabled={syncing || !isOnline}
           className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-100 transition-colors text-slate-900 relative disabled:opacity-50"
-          title="Sincronizar dados"
+          title={isOnline ? "Sincronizar dados" : "Sem conexão"}
         >
-          <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>sync</span>
+          <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>
+            {isOnline ? 'sync' : 'wifi_off'}
+          </span>
         </button>
       </header>
 
@@ -208,9 +229,15 @@ const CompletedScreen: React.FC = () => {
                 {localStorageService.getPendingCount() > 0 && (
                   <button
                     onClick={handleSyncAll}
-                    className="text-sm font-semibold text-primary hover:underline"
+                    disabled={isSyncing || !isOnline}
+                    className="text-sm font-semibold text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
-                    Sincronizar Tudo
+                    {!isOnline ? (
+                      <>
+                        <span className="material-symbols-outlined text-sm">wifi_off</span>
+                        Offline
+                      </>
+                    ) : isSyncing ? 'Sincronizando...' : 'Sincronizar Tudo'}
                   </button>
                 )}
               </div>

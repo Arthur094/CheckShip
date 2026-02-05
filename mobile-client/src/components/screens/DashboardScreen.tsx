@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../BottomNav';
 import { useAuth } from '../../App';
-import { driverService } from '../../services/driverService';
 import { localStorageService } from '../../services/localStorageService';
 import { cacheService } from '../../services/cacheService';
 import { supabase } from '../../lib/supabase';
@@ -10,11 +9,25 @@ import { supabase } from '../../lib/supabase';
 const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
-  const [inspections, setInspections] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<any[]>([]);
+  const [draftModalId, setDraftModalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Load last sync timestamp
   useEffect(() => {
@@ -27,18 +40,15 @@ const DashboardScreen: React.FC = () => {
     if (!session?.user?.id || loading) return;
     setLoading(true);
     try {
-      const data = await driverService.getRecentInspections(session.user.id);
-      setInspections(data || []);
-
-      // Load drafts
+      // Load only drafts - no completed inspections
       const draftData = localStorageService.getAllDrafts();
       setDrafts(draftData);
     } catch (error) {
-      console.error('Erro ao carregar inspeções:', error);
+      console.error('Erro ao carregar rascunhos:', error);
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, loading]);
 
   // Sync cache manually
   const handleSync = async () => {
@@ -81,11 +91,13 @@ const DashboardScreen: React.FC = () => {
         </div>
         <button
           onClick={handleSync}
-          disabled={syncing}
-          className="size-10 flex items-center justify-center disabled:opacity-50"
-          title="Sincronizar dados"
+          disabled={syncing || !isOnline}
+          className="size-10 flex items-center justify-center disabled:opacity-50 transition-opacity"
+          title={isOnline ? "Sincronizar dados" : "Sem conexão com a internet"}
         >
-          <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>sync</span>
+          <span className={`material-symbols-outlined ${syncing ? 'animate-spin' : ''}`}>
+            {isOnline ? 'sync' : 'wifi_off'}
+          </span>
         </button>
       </header>
 
@@ -93,12 +105,12 @@ const DashboardScreen: React.FC = () => {
         <div className="flex items-center justify-between pb-2">
           <h2 className="text-sm font-semibold text-slate-500 uppercase">Iniciados Recentes</h2>
           <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-            {drafts.length + inspections.length} Ativos
+            {drafts.length} Ativos
           </span>
         </div>
 
 
-        {drafts.length === 0 && inspections.length === 0 ? (
+        {drafts.length === 0 ? (
           <div className="text-center py-20 opacity-60">
             <span className="material-symbols-outlined text-5xl mb-2 text-slate-300">inventory_2</span>
             <p className="text-slate-400">Nenhum checklist em aberto.</p>
@@ -109,7 +121,7 @@ const DashboardScreen: React.FC = () => {
             {drafts.map((draft) => (
               <article
                 key={draft.id}
-                onClick={() => navigate(`/inspection/${draft.vehicleId}/${draft.templateId}`)}
+                onClick={() => setDraftModalId(draft.id)}
                 className="p-4 bg-white rounded-2xl shadow-sm border-2 border-blue-200 flex items-center justify-between cursor-pointer hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center gap-3">
@@ -128,22 +140,6 @@ const DashboardScreen: React.FC = () => {
                 <span className="material-symbols-outlined text-slate-400">chevron_right</span>
               </article>
             ))}
-
-            {/* Regular inspections */}
-            {inspections.map((inspection) => (
-              <article key={inspection.id} className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="size-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
-                    <span className="material-symbols-outlined">local_shipping</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold uppercase">{inspection.vehicles?.plate}</h3>
-                    <p className="text-xs text-slate-500">{inspection.template?.name || 'Template desconhecido'}</p>
-                  </div>
-                </div>
-                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
-              </article>
-            ))}
           </>
         )}
       </main>
@@ -159,6 +155,44 @@ const DashboardScreen: React.FC = () => {
           <span className="material-symbols-outlined text-[28px]">add</span>
         </button>
       </div>
+
+      {/* Draft Modal */}
+      {draftModalId && (() => {
+        const draft = drafts.find(d => d.id === draftModalId);
+        if (!draft) return null;
+
+        const handleResume = () => {
+          navigate(`/inspection/${draft.vehicleId}/${draft.templateId}`);
+          setDraftModalId(null);
+        };
+
+        const handleDelete = () => {
+          const draftKey = `${draft.vehicleId}_${draft.templateId}`;
+          localStorageService.removeDraft(draftKey);
+          setDraftModalId(null);
+          loadData();
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+              <h3 className="font-bold text-lg text-slate-900 mb-1">{draft.vehiclePlate}</h3>
+              <p className="text-sm text-slate-600 mb-6">{draft.templateName}</p>
+              <div className="space-y-3">
+                <button onClick={handleResume} className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary-dark transition-colors">
+                  Retomar
+                </button>
+                <button onClick={handleDelete} className="w-full py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">
+                  Excluir
+                </button>
+                <button onClick={() => setDraftModalId(null)} className="w-full py-3 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <BottomNav />
     </div>

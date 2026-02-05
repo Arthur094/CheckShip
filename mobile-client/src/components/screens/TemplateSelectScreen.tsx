@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { driverService } from '../../services/driverService';
+import { cacheService } from '../../services/cacheService';
 
 const TemplateSelectScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -17,18 +17,16 @@ const TemplateSelectScreen: React.FC = () => {
       if (!vehicleId) return;
       setLoading(true);
       try {
-        // Load templates (with offline fallback)
-        const templatesData = await driverService.getAvailableTemplates(vehicleId);
+        // Load templates from cache
+        const templatesData = cacheService.getTemplates();
         setTemplates(templatesData || []);
-        console.log('✅ Templates carregados:', templatesData?.length);
+        console.log('✅ Templates carregados do cache:', templatesData?.length);
 
-        // Try to load vehicle details (may fail offline)
-        try {
-          const vehicleData = await driverService.getVehicleDetail(vehicleId);
+        // Load vehicle from cache
+        const cachedVehicles = cacheService.getVehicles();
+        const vehicleData = cachedVehicles.find(v => v.id === vehicleId);
+        if (vehicleData) {
           setVehicle(vehicleData);
-        } catch (vehicleError) {
-          console.log('⚠️ Não foi possível carregar detalhes do veículo (offline)');
-          // Continue anyway - templates já foram carregados
         }
       } catch (error) {
         console.error('Erro ao carregar templates:', error);
@@ -50,15 +48,7 @@ const TemplateSelectScreen: React.FC = () => {
     setViolations(null);
 
     try {
-      const result = await driverService.checkDocuments(vehicleId, template);
-      if (result.ok) {
-        navigate(`/inspection/${vehicleId}/${template.id}`);
-      } else {
-        setViolations(result.violations || []);
-      }
-    } catch (error) {
-      console.error('Erro na validação de documentos:', error);
-      // Fallback: permite prosseguir em caso de erro técnico na validação
+      // Skip document check - allow offline inspection
       navigate(`/inspection/${vehicleId}/${template.id}`);
     } finally {
       setCheckingDocs(false);
@@ -108,7 +98,7 @@ const TemplateSelectScreen: React.FC = () => {
           <h3 className="text-slate-900 text-lg font-bold mb-4">Modelos Disponíveis</h3>
           <div className="space-y-3">
             {loading ? (
-              <p className="text-center py-10 text-slate-500">Buscando no banco...</p>
+              <p className="text-center py-10 text-slate-500">Carregando templates...</p>
             ) : filteredTemplates.length === 0 ? (
               <p className="text-center py-10 text-slate-500">Nenhum checklist vinculado.</p>
             ) : (

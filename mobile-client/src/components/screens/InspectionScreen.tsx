@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { driverService } from '../../services/driverService';
 import { supabase } from '../../lib/supabase';
@@ -55,20 +55,21 @@ const InspectionScreen: React.FC = () => {
     }
 
     try {
-      // Get vehicle and template names
-      const vehicleData = await supabase.from('vehicles').select('plate').eq('id', vehicleId).single();
+      // Get vehicle plate from cache (works offline)
+      const cachedVehicles = cacheService.getVehicles();
+      const vehicle = cachedVehicles.find(v => v.id === vehicleId);
 
       localStorageService.saveDraft({
         vehicleId,
         templateId,
-        vehiclePlate: vehicleData.data?.plate || 'Desconhecido',
+        vehiclePlate: vehicle?.plate || 'Desconhecido',
         templateName: template?.name || 'Template desconhecido',
         responses: answers,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
 
-      alert('💾 Rascunho salvo! Continue depois em "Iniciados".');
+      // alert('💾 Rascunho salvo! Continue depois em "Iniciados".');
       navigate('/');
     } catch (error: any) {
       console.error('Erro ao salvar rascunho:', error);
@@ -250,15 +251,14 @@ const InspectionScreen: React.FC = () => {
           return;
         }
 
-        const vehicleData = await supabase.from('vehicles').select('plate').eq('id', vehicleId).single();
-
-        // Tenta buscar usuario de novo caso tenha falhado antes
-        const currentUser = userId;
+        // Get vehicle plate from cache (works offline)
+        const cachedVehicles = cacheService.getVehicles();
+        const vehicle = cachedVehicles.find(v => v.id === vehicleId);
 
         localStorageService.savePendingInspection({
           checklist_template_id: templateId,
           vehicle_id: vehicleId,
-          inspector_id: currentUser,
+          inspector_id: userId,
           responses: answers,
           status: inspectionStatus,
           // Analysis workflow fields (for when synced later)
@@ -269,7 +269,7 @@ const InspectionScreen: React.FC = () => {
           completed_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          vehiclePlate: vehicleData.data?.plate || 'Desconhecido',
+          vehiclePlate: vehicle?.plate || 'Desconhecido',
           templateName: template?.name || 'Template desconhecido'
         });
 
@@ -288,9 +288,16 @@ const InspectionScreen: React.FC = () => {
 
   return (
     <div className="bg-background-light min-h-screen pb-24">
-      <header className="bg-white border-b p-4 sticky top-0 z-10 flex items-center gap-4">
-        <button onClick={() => navigate(-1)}><span className="material-symbols-outlined">arrow_back</span></button>
-        <h1 className="font-bold text-lg">{template?.name}</h1>
+      <header className="bg-white border-b p-4 sticky top-0 z-10 grid grid-cols-[40px_1fr_40px] items-center gap-2">
+        <button
+          onClick={handleSaveDraft}
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 transition-colors"
+          title="Salvar Rascunho"
+        >
+          <span className="material-symbols-outlined text-slate-600">save</span>
+        </button>
+        <h1 className="font-bold text-lg text-center truncate">{template?.name}</h1>
+        <div /> {/* Spacer para manter título centralizado */}
       </header>
 
       <main className="p-4 space-y-6">
@@ -773,7 +780,7 @@ const InspectionScreen: React.FC = () => {
                                   }));
 
                                   if (isOfflineImage) {
-                                    alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
+                                    // Image saved locally for later sync
                                   }
                                   // Imagem processada com sucesso - feedback visual é suficiente
 
@@ -932,7 +939,7 @@ const InspectionScreen: React.FC = () => {
                                   }));
 
                                   if (isOfflineImage) {
-                                    alert('Sem internet! Imagem salva no dispositivo para envio posterior.');
+                                    // Image saved locally for later sync
                                   }
                                   // Imagem processada com sucesso - feedback visual é suficiente
                                 } catch (error: any) {
@@ -966,12 +973,7 @@ const InspectionScreen: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t space-y-3">
-        <button
-          onClick={handleSaveDraft}
-          className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-semibold hover:bg-slate-200 transition-colors"
-        >
-          💾 Salvar Rascunho
-        </button>
+
         <button
           onClick={handleCompleteClick}
           disabled={saving}

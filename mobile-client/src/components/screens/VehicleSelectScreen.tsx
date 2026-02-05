@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
-import { driverService } from '../../services/driverService';
+import { cacheService } from '../../services/cacheService';
 
 const VehicleSelectScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -15,8 +15,9 @@ const VehicleSelectScreen: React.FC = () => {
       if (!session?.user?.id) return;
       setLoading(true);
       try {
-        const data = await driverService.getMyVehicles(session.user.id);
-        setVehicles(data || []);
+        // Get vehicles from cache instead of Supabase
+        const cachedVehicles = cacheService.getVehicles();
+        setVehicles(cachedVehicles || []);
       } catch (error) {
         console.error('Erro:', error);
       } finally {
@@ -50,7 +51,7 @@ const VehicleSelectScreen: React.FC = () => {
 
         <div className="space-y-3">
           {loading ? (
-            <p className="text-center py-10">Carregando dados do Supabase...</p>
+            <p className="text-center py-10">Carregando veículos...</p>
           ) : filtered.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-xl border border-dashed border-slate-300">
               <p className="text-slate-500">Nenhum veículo vinculado.</p>
