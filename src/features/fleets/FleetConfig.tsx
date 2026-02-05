@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import FleetForm from './FleetForm';
 import FleetUsers from './FleetUsers';
 import FleetChecklists from './FleetChecklists';
+import FleetTrailers from './FleetTrailers';
 import DocumentTab from '../../components/common/DocumentTab';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -153,6 +154,8 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                 return <FleetUsers vehicleId={formData.id} onEnsureExists={() => performSave(true)} />;
             case 'checklists':
                 return <FleetChecklists vehicleId={formData.id} onEnsureExists={() => performSave(true)} />;
+            case 'trailers':
+                return <FleetTrailers vehicleId={formData.id} vehicleConfigId={formData.vehicle_configuration_id} onEnsureExists={() => performSave(true)} />;
             case 'documents':
                 return <DocumentTab entityType="vehicle" entityId={formData.id} requiredDocs={['CRLV', 'CIV', 'CIPP', 'CVT', 'CCT', 'AET_FEDERAL', 'AET_ESTADUAL']} onEnsureExists={() => performSave(true)} />;
             default:
@@ -203,6 +206,12 @@ const FleetConfig: React.FC<FleetConfigProps> = ({ onBack, initialData }) => {
                         className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'checklists' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         Checklists
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('trailers')}
+                        className={`pb-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activeTab === 'trailers' ? 'border-blue-900 text-blue-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Carretas
                     </button>
                 </div>
             </div>

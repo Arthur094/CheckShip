@@ -15,8 +15,12 @@ interface Vehicle {
     model: string;
     brand: string;
     active: boolean;
-    trailer_id: string | null;
+    trailer_id_1: string | null;
+    trailer_id_2: string | null;
+    trailer_id_3: string | null;
     vehicle_type_id: string | null;
+    vehicle_configuration_id: string | null;
+    linked_slot?: number | null;
 }
 
 interface Option {
@@ -59,14 +63,28 @@ const TrailerVehicles: React.FC<TrailerVehiclesProps> = ({ trailerId, onEnsureEx
         try {
             setLoading(true);
 
-            // Fetch Vehicles
+            // Fetch Vehicles with new trailer columns
             const { data: vData, error: vError } = await supabase
                 .from('vehicles')
-                .select('id, plate, model, brand, active, trailer_id, vehicle_type_id')
+                .select('id, plate, model, brand, active, trailer_id_1, trailer_id_2, trailer_id_3, vehicle_type_id, vehicle_configuration_id')
                 .order('plate');
 
             if (vError) throw vError;
-            setVehicles(vData || []);
+
+            // Map vehicles and determine which slot the current trailer is in
+            const mappedVehicles = (vData || []).map(v => {
+                let linkedSlot = null;
+                if (v.trailer_id_1 === trailerId) linkedSlot = 1;
+                else if (v.trailer_id_2 === trailerId) linkedSlot = 2;
+                else if (v.trailer_id_3 === trailerId) linkedSlot = 3;
+
+                return {
+                    ...v,
+                    linked_slot: linkedSlot
+                };
+            });
+
+            setVehicles(mappedVehicles);
 
             // Fetch Trailers for filter
             const { data: bData, error: bError } = await supabase
@@ -96,33 +114,62 @@ const TrailerVehicles: React.FC<TrailerVehiclesProps> = ({ trailerId, onEnsureEx
 
     const handleToggle = async (vehicle: Vehicle) => {
         let currentTrailerId = trailerId;
-        const isLinked = !!currentTrailerId && vehicle.trailer_id === currentTrailerId;
+        const isLinked = vehicle.linked_slot !== null;
 
-        let newTargetTrailerId: string | null = null;
-
-        if (isLinked) {
-            newTargetTrailerId = null;
-        } else {
-            if (!currentTrailerId) {
-                currentTrailerId = await onEnsureExists();
-                if (!currentTrailerId) return;
-            }
-            newTargetTrailerId = currentTrailerId;
+        // Ensure trailer exists
+        if (!currentTrailerId) {
+            currentTrailerId = await onEnsureExists();
+            if (!currentTrailerId) return;
         }
 
         try {
-            if (newTargetTrailerId && vehicle.trailer_id && vehicle.trailer_id !== newTargetTrailerId) {
-                if (!confirm('Este veículo já está vinculado a outra Carreta. Deseja transferi-lo?')) return;
+            if (isLinked) {
+                // Unlinking: clear the specific slot
+                const slotKey = `trailer_id_${vehicle.linked_slot}`;
+                const { error } = await supabase
+                    .from('vehicles')
+                    .update({ [slotKey]: null })
+                    .eq('id', vehicle.id);
+
+                if (error) throw error;
+            } else {
+                // Linking: find first available slot
+                // First, check vehicle configuration to see max trailers allowed
+                const { data: configData } = await supabase
+                    .from('vehicle_configurations')
+                    .select('plates_count')
+                    .eq('id', vehicle.vehicle_configuration_id)
+                    .single();
+
+                const maxTrailers = configData?.plates_count || 0;
+
+                if (maxTrailers === 0) {
+                    alert('Este veículo não suporta carretas.');
+                    return;
+                }
+
+                // Find first available slot
+                let targetSlot = null;
+                if (!vehicle.trailer_id_1) targetSlot = 1;
+                else if (maxTrailers >= 2 && !vehicle.trailer_id_2) targetSlot = 2;
+                else if (maxTrailers >= 3 && !vehicle.trailer_id_3) targetSlot = 3;
+
+                if (!targetSlot) {
+                    alert(`Este veículo já atingiu o limite de ${maxTrailers} carreta(s).`);
+                    return;
+                }
+
+                const slotKey = `trailer_id_${targetSlot}`;
+                const { error } = await supabase
+                    .from('vehicles')
+                    .update({ [slotKey]: currentTrailerId })
+                    .eq('id', vehicle.id);
+
+                if (error) throw error;
             }
 
-            const { error } = await supabase
-                .from('vehicles')
-                .update({ trailer_id: newTargetTrailerId })
-                .eq('id', vehicle.id);
-
-            if (error) throw error;
-
-            setVehicles(prev => prev.map(v => v.id === vehicle.id ? { ...v, trailer_id: newTargetTrailerId } : v));
+            // Refresh data
+            await fetchData();
 
         } catch (error: any) {
             alert('Erro ao vincular veículo: ' + error.message);
@@ -138,7 +185,9 @@ const TrailerVehicles: React.FC<TrailerVehiclesProps> = ({ trailerId, onEnsureEx
                 (v.brand && v.brand.toLowerCase().includes(searchLower));
 
             const matchesTrailer = filters.trailers.length === 0 ||
-                (v.trailer_id && filters.trailers.includes(v.trailer_id));
+                filters.trailers.includes(v.trailer_id_1 || '') ||
+                filters.trailers.includes(v.trailer_id_2 || '') ||
+                filters.trailers.includes(v.trailer_id_3 || '');
 
             const matchesVehicleType = filters.vehicleTypes.length === 0 ||
                 (v.vehicle_type_id && filters.vehicleTypes.includes(v.vehicle_type_id));
@@ -149,7 +198,7 @@ const TrailerVehicles: React.FC<TrailerVehiclesProps> = ({ trailerId, onEnsureEx
 
             let matchesShow = true;
             if (filters.show.length > 0) {
-                const isLinked = !!trailerId && v.trailer_id === trailerId;
+                const isLinked = v.linked_slot !== null;
                 if (filters.show.includes('Selecionados') && !filters.show.includes('Não Selecionados')) {
                     matchesShow = isLinked;
                 } else if (filters.show.includes('Não Selecionados') && !filters.show.includes('Selecionados')) {
@@ -308,13 +357,14 @@ const TrailerVehicles: React.FC<TrailerVehiclesProps> = ({ trailerId, onEnsureEx
 
                     <div className="divide-y divide-slate-100">
                         {filteredVehicles.map((vehicle) => {
-                            const isLinked = !!trailerId && vehicle.trailer_id === trailerId;
+                            const isLinked = vehicle.linked_slot !== null;
                             return (
                                 <div key={vehicle.id} className={`grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors ${isLinked ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                     <div className="col-span-4"><span className="text-sm font-bold text-slate-700 block">{vehicle.plate}</span></div>
                                     <div className="col-span-4 text-sm text-slate-500">{vehicle.brand} / {vehicle.model}</div>
                                     <div className="col-span-2"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${vehicle.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{vehicle.active ? 'Ativo' : 'Inativo'}</span></div>
                                     <div className="col-span-2 flex justify-end items-center gap-2">
+                                        {isLinked && <span className="text-xs text-blue-600 mr-2">Slot {vehicle.linked_slot}</span>}
                                         <label className="relative inline-flex items-center cursor-pointer">
                                             <input type="checkbox" className="sr-only peer" checked={isLinked} onChange={() => handleToggle(vehicle)} />
                                             <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>

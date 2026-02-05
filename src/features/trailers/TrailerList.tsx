@@ -41,13 +41,40 @@ const TrailerList: React.FC<TrailerListProps> = ({ onNew, onEdit }) => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            // Fetch trailers
+            const { data: trailersData, error: trailersError } = await supabase
                 .from('trailers')
-                .select(`*, vehicles (id, plate)`)
+                .select('*')
                 .order('plate');
 
-            if (error) throw error;
-            setTrailers((data || []).map((t: any) => ({ ...t, active: t.active ?? true })));
+            if (trailersError) throw trailersError;
+
+            // Fetch all vehicles to map trailer relationships
+            const { data: vehiclesData, error: vehiclesError } = await supabase
+                .from('vehicles')
+                .select('id, plate, trailer_id_1, trailer_id_2, trailer_id_3');
+
+            if (vehiclesError) throw vehiclesError;
+
+            // Map trailers with their linked vehicles
+            const trailersWithVehicles = (trailersData || []).map((trailer: any) => {
+                const linkedVehicles = (vehiclesData || [])
+                    .filter((v: any) =>
+                        v.trailer_id_1 === trailer.id ||
+                        v.trailer_id_2 === trailer.id ||
+                        v.trailer_id_3 === trailer.id
+                    )
+                    .map((v: any) => ({ id: v.id, plate: v.plate }));
+
+                return {
+                    ...trailer,
+                    active: trailer.active ?? true,
+                    vehicles: linkedVehicles
+                };
+            });
+
+            setTrailers(trailersWithVehicles);
         } catch (error: any) {
             console.error('Error fetching trailers:', error.message);
         } finally {

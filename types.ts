@@ -48,7 +48,9 @@ export interface Vehicle {
   status: 'DISPONIVEL' | 'MANUTENCAO' | 'AGUARDANDO_REPARO';
   last_checklist_id?: string;
   branch_id?: string | null;
-  trailer_id?: string | null;
+  trailer_id_1?: string | null;
+  trailer_id_2?: string | null;
+  trailer_id_3?: string | null;
 }
 
 export interface Trailer {
