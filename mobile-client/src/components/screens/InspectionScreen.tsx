@@ -225,10 +225,15 @@ const InspectionScreen: React.FC = () => {
         const { data, error } = await supabase
           .from('checklist_inspections')
           .insert(inspectionData)
-          .select()
+          .select('*, vehicles(plate, model), template:checklist_templates(name)')
           .single();
 
         if (error) throw error;
+
+        // 🟢 Update local cache for "Sincronizados" tab
+        if (data) {
+          cacheService.addCompletedInspection(data);
+        }
 
         // Remove draft if exists
         if (vehicleId && templateId) {

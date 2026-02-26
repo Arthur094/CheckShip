@@ -5,6 +5,7 @@ import { useAuth } from '../../App';
 import { cacheService } from '../../services/cacheService';
 import { localStorageService } from '../../services/localStorageService';
 import { supabase } from '../../lib/supabase';
+import { Network } from '@capacitor/network';
 
 type Tab = 'synced' | 'pending';
 
@@ -19,16 +20,16 @@ const CompletedScreen: React.FC = () => {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+  useEffect(() => {
+    Network.getStatus().then(status => setIsOnline(status.connected));
+
+    const listener = Network.addListener('networkStatusChange', status => {
+      setIsOnline(status.connected);
+    });
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      listener.then(handle => handle.remove());
     };
   }, []);
 

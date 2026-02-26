@@ -270,6 +270,28 @@ export const cacheService = {
         localStorage.setItem(CACHE_KEYS.LAST_SYNC, new Date().toISOString());
     },
 
+    // Add single completed inspection to cache (for online finish)
+    addCompletedInspection(inspection: any): void {
+        try {
+            const current = this.getCompletedInspections();
+            // Check if already exists
+            if (current.some((i: any) => i.id === inspection.id)) return;
+
+            // Add new and sort desc
+            const updated = [inspection, ...current].sort((a, b) =>
+                new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+            );
+
+            // Keep limit of 30
+            if (updated.length > 30) updated.length = 30;
+
+            this.updateCompletedInspections(updated);
+            console.log('✅ Inspeção adicionada ao cache local:', inspection.id);
+        } catch (error) {
+            console.error('Erro ao adicionar inspeção ao cache:', error);
+        }
+    },
+
     // Clear all cache (on logout)
     clearCache(): void {
         Object.values(CACHE_KEYS).forEach(key => {

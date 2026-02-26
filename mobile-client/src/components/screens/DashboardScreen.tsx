@@ -5,6 +5,7 @@ import { useAuth } from '../../App';
 import { localStorageService } from '../../services/localStorageService';
 import { cacheService } from '../../services/cacheService';
 import { supabase } from '../../lib/supabase';
+import { Network } from '@capacitor/network';
 
 const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -16,16 +17,18 @@ const DashboardScreen: React.FC = () => {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+  useEffect(() => {
+    // Check initial status
+    Network.getStatus().then(status => setIsOnline(status.connected));
+
+    // Listen for changes
+    const listener = Network.addListener('networkStatusChange', status => {
+      setIsOnline(status.connected);
+    });
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      listener.then(handle => handle.remove());
     };
   }, []);
 
