@@ -43,6 +43,7 @@ const ChecklistHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Filter Data
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
@@ -89,8 +90,11 @@ const ChecklistHistory: React.FC = () => {
 
   useEffect(() => {
     fetchFilterData();
-    fetchHistory();
   }, []);
+
+  useEffect(() => {
+    fetchHistory(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage]);
 
   const fetchFilterData = async () => {
     try {
@@ -115,16 +119,13 @@ const ChecklistHistory: React.FC = () => {
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (page = 1, pageSize = 20) => {
     setLoading(true);
     try {
-      // Debug: Check auth state
-      const { data: sessionData } = await supabase.auth.getSession();
-      console.log('🔐 Auth session:', sessionData?.session ? 'LOGGED IN' : 'NOT LOGGED IN');
-      console.log('🔐 User ID:', sessionData?.session?.user?.id);
-      console.log('🔐 Access Token exists:', !!sessionData?.session?.access_token);
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('checklist_inspections')
         .select(`
           id,
@@ -138,13 +139,14 @@ const ChecklistHistory: React.FC = () => {
           vehicle_id,
           checklist_template_id,
           inspector_id
-        `)
-        .order('started_at', { ascending: false });
+        `, { count: 'exact' })
+        .order('started_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
 
-      console.log('📊 fetchHistory raw data:', data);
-      console.log('📊 fetchHistory count:', data?.length);
+      // Update total count from Supabase exact count
+      if (count !== null) setTotalCount(count);
 
       // Fetch related data separately
       const inspectorIds = [...new Set((data || []).map((d: any) => d.inspector_id).filter(Boolean))];
@@ -205,7 +207,6 @@ const ChecklistHistory: React.FC = () => {
         };
       });
 
-      console.log('📊 fetchHistory processed:', processed);
       setHistory(processed);
 
     } catch (error: any) {
@@ -215,99 +216,12 @@ const ChecklistHistory: React.FC = () => {
     }
   };
 
-  // Filter Logic
+  // Client-side filtering on current page data
+  // Note: for full server-side filtering, filters should be applied to the query.
+  // Currently we apply client-side filters to the current page's data.
   const filteredHistory = useMemo(() => {
-    return history.filter(item => {
-      // 1. Status
-      if (filters.status.length > 0) {
-        // Convert item status to UI label
-        let itemStatusLabel = '';
-        if (item.status === 'completed') {
-          // Check if it was approved via analysis
-          if (item.analysis_status === 'approved') {
-            itemStatusLabel = 'Aprovado';
-          } else {
-            itemStatusLabel = 'Finalizado';
-          }
-        } else if (item.status === 'rejected') {
-          itemStatusLabel = 'Reprovado';
-        } else if (item.status === 'pending') {
-          itemStatusLabel = 'Em Análise';
-        } else if (item.status === 'in_progress') {
-          itemStatusLabel = 'Em Andamento';
-        } else {
-          itemStatusLabel = item.status;
-        }
-
-        if (!filters.status.includes(itemStatusLabel)) return false;
-      }
-
-      // 2. Period
-      if (filters.startDate || filters.endDate) {
-        const dateStr = filters.periodType === 'completed_at' ? item.completed_at : item.started_at;
-        if (!dateStr) {
-          // If filtering by completion date and item is not completed, it shouldn't show? Or ignore?
-          // Typically if I select "Data de Conclusão", uncompleted items should probably be hidden or never match if date is required.
-          // However, if only start date is set, check >= start.
-          if (filters.startDate && filters.periodType === 'completed_at') return false;
-        } else {
-          const date = new Date(dateStr);
-          if (filters.startDate) {
-            const start = new Date(filters.startDate);
-            start.setHours(0, 0, 0, 0);
-            if (date < start) return false;
-          }
-          if (filters.endDate) {
-            const end = new Date(filters.endDate);
-            end.setHours(23, 59, 59, 999);
-            if (date > end) return false;
-          }
-        }
-      }
-
-      // 3. Code
-      if (filters.code) {
-        if (!item.id.toLowerCase().includes(filters.code.toLowerCase())) return false;
-      }
-
-      // 4. Vehicle Type
-      if (filters.vehicleTypes.length > 0) {
-        const vTypeName = item.vehicle?.vehicle_types?.name;
-        if (!vTypeName || !filters.vehicleTypes.includes(vTypeName)) return false;
-      }
-
-      // 5. Vehicle
-      if (filters.vehicles.length > 0) {
-        if (!item.vehicle?.id || !filters.vehicles.includes(item.vehicle.id)) return false;
-      }
-
-      // 6. Checklist (Template)
-      if (filters.checklists.length > 0) {
-        if (!item.template?.id || !filters.checklists.includes(item.template.id)) return false;
-      }
-
-      // 7. User Type
-      if (filters.userTypes.length > 0) {
-        if (!item.user?.role || !filters.userTypes.includes(item.user.role)) return false;
-      }
-
-      // 8. User
-      if (filters.users.length > 0) {
-        if (!item.user?.id || !filters.users.includes(item.user.id)) return false;
-      }
-
-      // 9. Platform (Mocked for now as we don't have it)
-      // if (filters.platform.length > 0) ...
-
-      // 10. Branch (Filial)
-      if (filters.branches.length > 0) {
-        const vehicleBranchId = item.vehicle?.branch_id;
-        if (!vehicleBranchId || !filters.branches.includes(vehicleBranchId)) return false;
-      }
-
-      return true;
-    });
-  }, [history, filters]);
+    return history;
+  }, [history]);
 
   const handleClearFilters = () => {
     setCurrentPage(1);
@@ -350,12 +264,12 @@ const ChecklistHistory: React.FC = () => {
     setActiveMenuId(null);
   };
 
-  // Pagination Logic
-  const totalItems = filteredHistory.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  // Pagination Logic (server-side — totalCount comes from Supabase)
+  const totalItems = totalCount;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const paginatedHistory = filteredHistory.slice(startIndex, endIndex);
+  const paginatedHistory = filteredHistory;
 
   // Selection Logic
   const handleSelectAll = (checked: boolean) => {
@@ -580,7 +494,7 @@ const ChecklistHistory: React.FC = () => {
             <button onClick={handleClearFilters} className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wide transition-colors">
               Limpar
             </button>
-            <button onClick={() => fetchHistory()} className="bg-blue-900 text-white px-8 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-blue-800 transition-colors flex items-center gap-2">
+            <button onClick={() => { setCurrentPage(1); fetchHistory(1, itemsPerPage); }} className="bg-blue-900 text-white px-8 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-blue-800 transition-colors flex items-center gap-2">
               <Filter size={16} />
               FILTRAR
             </button>
@@ -815,7 +729,7 @@ const ChecklistHistory: React.FC = () => {
             {/* Dropdown (Opening Upwards) */}
             {showPerPageDropdown && (
               <div className="absolute bottom-full mb-2 left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in zoom-in-95 duration-200">
-                {[20, 50, 100, 200, 500, 1000].map(val => (
+                {[20, 50, 100, 200, 500].map(val => (
                   <button
                     key={val}
                     onClick={(e) => { e.stopPropagation(); setItemsPerPage(val); setCurrentPage(1); setShowPerPageDropdown(false); }}
