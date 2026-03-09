@@ -18,6 +18,7 @@ const InspectionScreen: React.FC = () => {
   // Signature states
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [driverSignatureUrl, setDriverSignatureUrl] = useState<string | null>(null);
+  const [missingRequiredItems, setMissingRequiredItems] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadTemplate() {
@@ -47,6 +48,17 @@ const InspectionScreen: React.FC = () => {
     observation: observation || null,
     photos: photos || []
   });
+
+  // Auto-clear missing required highlights when items get answered
+  useEffect(() => {
+    if (missingRequiredItems.length === 0) return;
+    setMissingRequiredItems(prev =>
+      prev.filter(itemId => {
+        const ans = answers[itemId]?.answer;
+        return ans === undefined || ans === null || ans === '' || (Array.isArray(ans) && ans.length === 0);
+      })
+    );
+  }, [answers]);
 
   const handleSaveDraft = async () => {
     if (!vehicleId || !templateId) {
@@ -79,6 +91,31 @@ const InspectionScreen: React.FC = () => {
 
   // Handle button click - check if signature required
   const handleCompleteClick = () => {
+    // Validar itens obrigatórios não respondidos
+    if (template?.structure?.areas) {
+      const missing: { id: string; name: string }[] = [];
+      template.structure.areas.forEach((area: any) => {
+        const allItems = [...(area.items || [])];
+        if (area.sub_areas) {
+          area.sub_areas.forEach((sub: any) => allItems.push(...(sub.items || [])));
+        }
+        allItems.forEach((item: any) => {
+          if (!item?.config?.required) return;
+          const ans = answers[item.id]?.answer;
+          const isEmpty = ans === undefined || ans === null || ans === '' || (Array.isArray(ans) && ans.length === 0);
+          if (isEmpty) {
+            missing.push({ id: item.id, name: item.name });
+          }
+        });
+      });
+      if (missing.length > 0) {
+        setMissingRequiredItems(missing.map(m => m.id));
+        const names = missing.map(m => `• ${m.name}`).join('\n');
+        alert(`⚠️ ITENS OBRIGATÓRIOS PENDENTES\n\nOs seguintes itens precisam ser respondidos:\n${names}`);
+        return;
+      }
+    }
+
     const requiresSignature = template?.settings?.require_driver_signature;
 
     if (requiresSignature && !driverSignatureUrl) {
@@ -322,10 +359,14 @@ const InspectionScreen: React.FC = () => {
               }
 
               return (
-                <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-3">
+                <div key={item.id} className={`bg-white p-4 rounded-xl border shadow-sm space-y-3 ${missingRequiredItems.includes(item.id) ? 'border-red-400 bg-red-50 ring-2 ring-red-200' : 'border-slate-100'}`}>
                   <p className="font-medium text-slate-900">
                     {item.name || item.label || 'Questão sem título'}
+                    {item.config?.required && <span className="text-red-500 font-bold ml-1">*</span>}
                   </p>
+                  {missingRequiredItems.includes(item.id) && (
+                    <p className="text-xs text-red-600 font-bold animate-pulse">⚠️ Resposta obrigatória</p>
+                  )}
 
                   {/* DEBUG: Log item config */}
                   {(() => { console.log('Item:', item.name, 'Type:', item.type, 'Config:', item.config); return null; })()}

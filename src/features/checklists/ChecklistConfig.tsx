@@ -164,6 +164,7 @@ interface AreaItem {
     selectionType?: 'single' | 'multiple';
     selectionOptions?: string[];
     hint?: string;
+    required?: boolean;
     allow_photo?: boolean;
     allow_attachment?: boolean;
     options?: string[]; // Legacy fallback
@@ -357,6 +358,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               selectionType: dbItem.config?.selection_type || 'single',
               selectionOptions: dbItem.config?.selection_options || dbItem.config?.options || [],
               hint: dbItem.config?.hint || '',
+              required: dbItem.config?.required ?? false,
               allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
               allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
               input_style: dbItem.config?.input_style || 'default',
@@ -379,6 +381,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 selectionType: dbItem.config?.selection_type || 'single',
                 selectionOptions: dbItem.config?.selection_options || dbItem.config?.options || [],
                 hint: dbItem.config?.hint || '',
+                required: dbItem.config?.required ?? false,
                 allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
                 allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
                 input_style: dbItem.config?.input_style || 'default',
@@ -505,6 +508,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               mandatory_attachment: item.mandatoryAttachment,
               config: {
                 hint: item.config?.hint,
+                required: item.config?.required,
                 scale_type: item.scaleType as any,
                 numeric_option: item.config?.numericOption,
                 registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined,
@@ -528,6 +532,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 mandatory_attachment: sitem.mandatoryAttachment,
                 config: {
                   hint: sitem.config?.hint,
+                  required: sitem.config?.required,
                   scale_type: sitem.scaleType as any,
                   numeric_option: sitem.config?.numericOption,
                   registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
@@ -611,7 +616,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
   const handleSave = () => performSave(false);
 
   const handleCreateVersion = async () => {
-    if (!confirm(`Deseja criar a versão ${version + 1} deste checklist?`)) return;
+    console.log('🔵 handleCreateVersion called! status:', status, 'version:', version);
+    // confirm removed - was being blocked by browser
 
     try {
       const newId = `chk_${Date.now()}`; // Temporary ID, let DB/Upsert handle if simpler
@@ -639,6 +645,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               mandatory_attachment: item.mandatoryAttachment,
               config: {
                 hint: item.config?.hint,
+                required: item.config?.required,
                 scale_type: item.scaleType as any,
                 numeric_option: item.config?.numericOption,
                 registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined,
@@ -647,7 +654,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 allow_photo: item.mandatoryAttachment,
                 allow_attachment: item.mandatoryAttachment,
                 input_style: (item.config as any)?.input_style,
-                require_photo_on: (item.config as any)?.require_photo_on
+                require_photo_on: (item.config as any)?.require_photo_on,
+                photo_required_options: (item.config as any)?.photo_required_options
               }
             })) || [],
             sub_areas: area.subAreas?.map(sub => ({
@@ -660,6 +668,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 mandatory_attachment: sitem.mandatoryAttachment,
                 config: {
                   hint: sitem.config?.hint,
+                  required: sitem.config?.required,
                   scale_type: sitem.scaleType as any,
                   numeric_option: sitem.config?.numericOption,
                   registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
@@ -668,7 +677,8 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   allow_photo: sitem.mandatoryAttachment,
                   allow_attachment: sitem.mandatoryAttachment,
                   input_style: (sitem.config as any)?.input_style,
-                  require_photo_on: (sitem.config as any)?.require_photo_on
+                  require_photo_on: (sitem.config as any)?.require_photo_on,
+                  photo_required_options: (sitem.config as any)?.photo_required_options
                 }
               })) || []
             })) || []
@@ -716,7 +726,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
   };
 
   const handlePublish = async () => {
-    if (!confirm('Ao publicar, esta versão se tornará a ativa e a anterior será arquivada. Continuar?')) return;
+    // confirm removed - being blocked by browser
 
     try {
       // 1. Archive others in group
@@ -798,6 +808,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
   const [inputStyle, setInputStyle] = useState<'smile_5' | 'smile_3' | 'thumbs' | 'default'>('default');
   const [requirePhotoOn, setRequirePhotoOn] = useState<string[]>([]);
   const [photoRequiredOptions, setPhotoRequiredOptions] = useState<string[]>([]);
+  const [itemRequired, setItemRequired] = useState(false);
 
   const resetItemForm = () => {
     setItemName('');
@@ -813,6 +824,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     setSelectionOptions([]);
     setHintText('');
     setShowHint(false);
+    setItemRequired(false);
     setEditingItemIdx(null);
   };
 
@@ -866,6 +878,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
         setHintText(item.config.hint || '');
         setShowHint(!!item.config.hint);
+        setItemRequired(item.config.required ?? false);
       }
 
       // Restore scale if applicable - check both local (scaleType) and DB (config.scale_type)
@@ -913,6 +926,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         selectionType,
         selectionOptions: finalSelectionOptions,
         hint: hintText,
+        required: itemRequired,
         input_style: itemType === 'Avaliativo' ? inputStyle : undefined,
         require_photo_on: itemType === 'Avaliativo' ? requirePhotoOn : undefined,
         photo_required_options: itemType === 'Lista de Seleção' ? photoRequiredOptions : undefined
@@ -1624,6 +1638,11 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
           <span className="text-sm font-bold text-slate-700">{item.name}</span>
         </div>
         <div className="flex items-center gap-4 relative">
+          {item.config?.required && (
+            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded uppercase flex items-center gap-1">
+              <AlertTriangle size={10} /> Obrigatório
+            </span>
+          )}
           <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase">{item.type}</span>
           <div className="flex gap-2 relative">
             <button
@@ -1949,6 +1968,20 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   rows={3}
                 />
               )}
+            </div>
+
+            {/* Toggle Obrigatório */}
+            <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <div>
+                <p className="text-sm font-bold text-amber-800">Obrigatório</p>
+                <p className="text-xs text-amber-600">Bloqueia finalização se não respondido</p>
+              </div>
+              <button
+                onClick={() => setItemRequired(!itemRequired)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${itemRequired ? 'bg-amber-500' : 'bg-slate-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow ${itemRequired ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
             </div>
 
             <div className="flex justify-end gap-4 pt-4 border-t border-slate-100">

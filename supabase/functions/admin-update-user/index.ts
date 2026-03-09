@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -13,7 +13,11 @@ Deno.serve(async (req) => {
     try {
         const authHeader = req.headers.get('Authorization')
         if (!authHeader) {
-            throw new Error('Missing Authorization header')
+            console.error('Missing Authorization header')
+            return new Response(
+                JSON.stringify({ error: 'Missing Authorization header' }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
         }
 
         const supabaseClient = createClient(
@@ -24,15 +28,22 @@ Deno.serve(async (req) => {
 
         // 1. Verify requester is GESTOR
         const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-        if (userError || !user) throw new Error('Not authenticated')
 
-        const { data: requesterProfile } = await supabaseClient
+        if (userError || !user) {
+            console.error('Erro ao obter usuário (getUser):', userError)
+            return new Response(
+                JSON.stringify({ error: 'Não autenticado', details: userError }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
+        const { data: requesterProfile, error: profileError } = await supabaseClient
             .from('profiles')
             .select('role')
             .eq('id', user.id)
             .single()
 
-        if (requesterProfile?.role !== 'GESTOR') {
+        if (profileError || requesterProfile?.role !== 'GESTOR') {
             return new Response(
                 JSON.stringify({ error: 'Acesso negado. Apenas GESTORES podem atualizar usuários.' }),
                 { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,6 +67,8 @@ Deno.serve(async (req) => {
         if (app_metadata) updateData.app_metadata = app_metadata
         if (user_metadata) updateData.user_metadata = user_metadata
 
+        console.log('Atualizando usuário:', user_id, 'campos:', Object.keys(updateData))
+
         const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
             user_id,
             updateData
@@ -69,8 +82,9 @@ Deno.serve(async (req) => {
         )
 
     } catch (error: any) {
+        console.error('Erro na função admin-update-user:', error)
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: error.message || 'Erro interno no servidor' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }

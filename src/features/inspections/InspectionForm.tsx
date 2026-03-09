@@ -33,6 +33,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     // Signature states
     const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [driverSignatureUrl, setDriverSignatureUrl] = useState<string | null>(null);
+    const [missingRequiredItems, setMissingRequiredItems] = useState<string[]>([]);
 
     useEffect(() => {
         const init = async () => {
@@ -113,6 +114,9 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     }, [checklistId, vehicleId]);
 
     const handleAnswerChange = (itemId: string, value: any) => {
+        // Clear from missing required list when answered
+        setMissingRequiredItems(prev => prev.filter(id => id !== itemId));
+
         setAnswers(prev => {
             const current = prev[itemId] || { item_id: itemId };
             const timestamp = new Date().toISOString();
@@ -124,7 +128,6 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                     [itemId]: {
                         ...current,
                         imageUrl: value.imageUrl,
-                        // Update timestamp only if not already set or force update if desired
                         answered_at: current.answered_at || timestamp
                     }
                 };
@@ -195,7 +198,34 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
 
     // Handle complete button click - check if signature required
     const handleCompleteClick = () => {
-        // ⬅️ NOVO: Validar foto obrigatória em opções de seleção
+        // Validar itens obrigatórios não respondidos
+        if (template?.structure?.areas) {
+            const missing: { id: string; name: string }[] = [];
+            for (const area of template.structure.areas) {
+                const allItems = [...(area.items || [])];
+                if (area.sub_areas) {
+                    for (const subArea of area.sub_areas) {
+                        allItems.push(...(subArea.items || []));
+                    }
+                }
+                for (const item of allItems) {
+                    if (!item?.config?.required) continue;
+                    const ans = answers[item.id]?.answer;
+                    const isEmpty = ans === undefined || ans === null || ans === '' || (Array.isArray(ans) && ans.length === 0);
+                    if (isEmpty) {
+                        missing.push({ id: item.id, name: item.name });
+                    }
+                }
+            }
+            if (missing.length > 0) {
+                setMissingRequiredItems(missing.map(m => m.id));
+                const names = missing.map(m => `• ${m.name}`).join('\n');
+                alert(`⚠️ ITENS OBRIGATÓRIOS PENDENTES\n\nOs seguintes itens precisam ser respondidos:\n${names}`);
+                return;
+            }
+        }
+
+        // Validar foto obrigatória em opções de seleção
         if (template?.structure?.areas) {
             for (const area of template.structure.areas) {
                 // Check items directly in area
@@ -398,6 +428,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                                     onChange={(val) => handleAnswerChange(item.id, val)}
                                     inspectionId={inspectionId}
                                     allowGallery={template?.settings?.allow_gallery ?? true}
+                                    isMissingRequired={missingRequiredItems.includes(item.id)}
                                 />
                             ))}
 
@@ -416,6 +447,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
                                                 onChange={(val) => handleAnswerChange(item.id, val)}
                                                 inspectionId={inspectionId}
                                                 allowGallery={template?.settings?.allow_gallery ?? true}
+                                                isMissingRequired={missingRequiredItems.includes(item.id)}
                                             />
                                         ))}
                                     </div>
@@ -444,12 +476,13 @@ const InspectionForm: React.FC<InspectionFormProps> = ({ checklistId, vehicleId,
     );
 };
 
-const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
+const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isMissingRequired = false }: {
     item: any,
     value: any,
     onChange: (val: any) => void,
     inspectionId: string | null,
-    allowGallery: boolean
+    allowGallery: boolean,
+    isMissingRequired?: boolean
 }) => {
     const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
@@ -645,12 +678,15 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery }: {
     const isSmileScale = item.config?.scale_type === 'faces_3' || item.config?.scale_type === 'faces_2';
 
     return (
-        <div className="p-6 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0">
+        <div className={`p-6 transition-colors border-b last:border-0 ${isMissingRequired ? 'bg-red-50/50 border-red-200 ring-2 ring-red-200' : 'hover:bg-slate-50/50 border-slate-50'}`}>
             <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-start">
-                    <label className="text-sm font-bold text-slate-700 leading-snug">{item.name}</label>
+                    <label className="text-sm font-bold text-slate-700 leading-snug">
+                        {item.name}
+                        {item.config?.required && <span className="text-red-500 font-bold ml-1">*</span>}
+                    </label>
                     <div className="flex gap-2">
-                        {item.mandatory && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold uppercase">Obrigatório</span>}
+                        {isMissingRequired && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold uppercase animate-pulse">Resposta Obrigatória</span>}
                         {isMandatoryAttachment && <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded font-bold uppercase">Foto Obrigatória</span>}
                     </div>
                 </div>

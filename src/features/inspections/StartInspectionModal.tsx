@@ -79,12 +79,15 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
             if (!currentUserId) return;
 
             try {
+                console.log('🔵 fetchVehicles: currentUserId =', currentUserId);
                 // 1. Get assignments
                 const { data: assignments, error: assignError } = await supabase
                     .from('vehicle_assignments')
                     .select('vehicle_id')
                     .eq('profile_id', currentUserId)
                     .eq('active', true);
+
+                console.log('🔵 fetchVehicles: assignments =', assignments?.length, 'error =', assignError);
 
                 if (assignError) throw assignError;
 
@@ -98,13 +101,15 @@ const StartInspectionModal: React.FC<StartInspectionModalProps> = ({ onClose, on
                 // 2. Get vehicle details
                 const { data: vehicleData, error: vehicleError } = await supabase
                     .from('vehicles')
-                    .select('id, plate, model, vehicle_type_id, trailer_id')
+                    .select('id, plate, model, vehicle_type_id, trailer_id_1')
                     .in('id', vehicleIds)
                     .eq('active', true); // Check active vehicle status just in case
 
+                console.log('🔵 fetchVehicles: vehicleData =', vehicleData?.length, 'error =', vehicleError);
+
                 if (vehicleError) throw vehicleError;
 
-                setVehicles(vehicleData || []);
+                setVehicles((vehicleData || []).map((v: any) => ({ ...v, trailer_id: v.trailer_id_1 })));
             } catch (error) {
                 console.error('Error fetching vehicles:', error);
             } finally {

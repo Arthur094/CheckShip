@@ -107,6 +107,7 @@ export interface Driver {
  */
 export interface ChecklistItemConfig {
   hint?: string;
+  required?: boolean;
   scale_type?: 'ns' | 'brr'; // ns: Sim/Não | brr: Bom/Regular/Ruim
   input_style?: 'smile_5' | 'smile_3' | 'thumbs' | 'default'; // Estilo visual da resposta
   require_photo_on?: string[]; // Valores que exigem foto obrigatória (ex: ['ruim', 'nao'])
