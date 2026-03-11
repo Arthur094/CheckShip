@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { driverService } from '../../services/driverService';
 import { supabase } from '../../lib/supabase';
@@ -262,7 +262,7 @@ const InspectionScreen: React.FC = () => {
         const { data, error } = await supabase
           .from('checklist_inspections')
           .insert(inspectionData)
-          .select('*, vehicles(plate, model), template:checklist_templates(name)')
+          .select('*, vehicles(plate, model), template:checklist_templates!checklist_template_id(name)')
           .single();
 
         if (error) throw error;
