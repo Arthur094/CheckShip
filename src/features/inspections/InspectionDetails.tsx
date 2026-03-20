@@ -875,24 +875,34 @@ function renderAnswerValue(item: any, answer: any) {
         return <span className="text-xs text-slate-400 italic font-medium">Não respondido</span>;
     }
 
+    const normalizedAnswer = String(answer).toLowerCase();
+
     // Smileys / Evaluative
     if (item.type === 'Avaliativo') {
+        if (normalizedAnswer === 'na' || normalizedAnswer === 'n/a') {
+            return (
+                <div className="flex flex-col items-end gap-1">
+                    <span className="px-3 py-1 bg-slate-200 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-300">N/A</span>
+                </div>
+            );
+        }
+        
         // Faces logic consistent with InspectionForm
-        if (answer === 'conforme' || answer === 'bom' || answer === 'otimo' || answer === 'sim') {
+        if (normalizedAnswer === 'conforme' || normalizedAnswer === 'bom' || normalizedAnswer === 'otimo' || normalizedAnswer === 'sim') {
             return (
                 <div className="flex flex-col items-center">
                     <Smile className="text-green-500" size={24} strokeWidth={2.5} />
                 </div>
             );
         }
-        if (answer === 'nao_conforme' || answer === 'ruim' || answer === 'pessimo' || answer === 'nao') {
+        if (normalizedAnswer === 'não conforme' || normalizedAnswer === 'nao conforme' || normalizedAnswer === 'nao_conforme' || normalizedAnswer === 'ruim' || normalizedAnswer === 'pessimo' || normalizedAnswer === 'nao' || normalizedAnswer === 'não') {
             return (
                 <div className="flex flex-col items-center">
                     <Frown className="text-red-500" size={24} strokeWidth={2.5} />
                 </div>
             );
         }
-        if (answer === 'regular' || answer === 'meh') {
+        if (normalizedAnswer === 'regular' || normalizedAnswer === 'meh') {
             return (
                 <div className="flex flex-col items-center">
                     <Meh className="text-amber-500" size={24} strokeWidth={2.5} />

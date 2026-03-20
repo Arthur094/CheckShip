@@ -110,6 +110,7 @@ export interface ChecklistItemConfig {
   required?: boolean;
   scale_type?: 'ns' | 'brr'; // ns: Sim/Não | brr: Bom/Regular/Ruim
   input_style?: 'smile_5' | 'smile_3' | 'thumbs' | 'default'; // Estilo visual da resposta
+  has_na?: boolean; // Permite a opção "Não Aplicável"
   require_photo_on?: string[]; // Valores que exigem foto obrigatória (ex: ['ruim', 'nao'])
   selection_type?: 'single' | 'multiple';
   selection_options?: string[];

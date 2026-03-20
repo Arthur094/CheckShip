@@ -169,6 +169,7 @@ interface AreaItem {
     allow_attachment?: boolean;
     options?: string[]; // Legacy fallback
     input_style?: 'default' | 'thumbs' | 'smile_3' | 'smile_5' | 'happy_sad' | 'n_s';
+    has_na?: boolean;
     require_photo_on?: string[];
     photo_required_options?: string[];
   };
@@ -359,6 +360,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               selectionOptions: dbItem.config?.selection_options || dbItem.config?.options || [],
               hint: dbItem.config?.hint || '',
               required: dbItem.config?.required ?? false,
+              has_na: dbItem.config?.has_na ?? false,
               allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
               allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
               input_style: dbItem.config?.input_style || 'default',
@@ -382,6 +384,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 selectionOptions: dbItem.config?.selection_options || dbItem.config?.options || [],
                 hint: dbItem.config?.hint || '',
                 required: dbItem.config?.required ?? false,
+                has_na: dbItem.config?.has_na ?? false,
                 allow_photo: dbItem.config?.allow_photo || dbItem.mandatory_attachment || false,
                 allow_attachment: dbItem.config?.allow_attachment || dbItem.mandatory_attachment || false,
                 input_style: dbItem.config?.input_style || 'default',
@@ -509,6 +512,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               config: {
                 hint: item.config?.hint,
                 required: item.config?.required,
+                has_na: item.config?.has_na,
                 scale_type: item.scaleType as any,
                 numeric_option: item.config?.numericOption,
                 registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined,
@@ -533,6 +537,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 config: {
                   hint: sitem.config?.hint,
                   required: sitem.config?.required,
+                  has_na: sitem.config?.has_na,
                   scale_type: sitem.scaleType as any,
                   numeric_option: sitem.config?.numericOption,
                   registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
@@ -646,6 +651,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
               config: {
                 hint: item.config?.hint,
                 required: item.config?.required,
+                has_na: item.config?.has_na,
                 scale_type: item.scaleType as any,
                 numeric_option: item.config?.numericOption,
                 registry_type: item.config?.registryOptions?.length ? item.config.registryOptions[0] : undefined,
@@ -669,6 +675,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                 config: {
                   hint: sitem.config?.hint,
                   required: sitem.config?.required,
+                  has_na: sitem.config?.has_na,
                   scale_type: sitem.scaleType as any,
                   numeric_option: sitem.config?.numericOption,
                   registry_type: sitem.config?.registryOptions?.length ? sitem.config.registryOptions[0] : undefined,
@@ -806,6 +813,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
   // New configuration states
   const [inputStyle, setInputStyle] = useState<'smile_5' | 'smile_3' | 'thumbs' | 'default'>('default');
+  const [hasNa, setHasNa] = useState<boolean>(false);
   const [requirePhotoOn, setRequirePhotoOn] = useState<string[]>([]);
   const [photoRequiredOptions, setPhotoRequiredOptions] = useState<string[]>([]);
   const [itemRequired, setItemRequired] = useState(false);
@@ -816,6 +824,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
     setMandatoryAttachment(false);
     setScaleIdx(0);
     setInputStyle('default');
+    setHasNa(false);
     setRequirePhotoOn([]);
     setPhotoRequiredOptions([]);
     setRegistryOptions([]);
@@ -860,6 +869,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
 
         // Load new fields
         setInputStyle((item.config as any).input_style || 'default');
+        setHasNa(item.config?.has_na || (item.config as any).hasNa || false);
         setRequirePhotoOn((item.config as any).require_photo_on || []);
 
         // FIX: Support both camelCase and snake_case for photo_required_options
@@ -927,6 +937,7 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
         selectionOptions: finalSelectionOptions,
         hint: hintText,
         required: itemRequired,
+        has_na: itemType === 'Avaliativo' ? hasNa : undefined,
         input_style: itemType === 'Avaliativo' ? inputStyle : undefined,
         require_photo_on: itemType === 'Avaliativo' ? requirePhotoOn : undefined,
         photo_required_options: itemType === 'Lista de Seleção' ? photoRequiredOptions : undefined
@@ -1948,6 +1959,15 @@ const ChecklistConfig: React.FC<ChecklistConfigProps> = ({ initialTemplate, onBa
                   <Clipboard size={14} />
                   {mandatoryAttachment ? 'Obrigar Anexo' : 'Anexos Opcionais'}
                 </button>
+                {itemType === 'Avaliativo' && (
+                  <button
+                    onClick={() => setHasNa(!hasNa)}
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${hasNa ? 'bg-blue-100 text-blue-900 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                  >
+                    <Info size={14} />
+                    {hasNa ? 'Opção N/A Habilitada' : 'Sem Opção N/A'}
+                  </button>
+                )}
               </div>
             </div>
 

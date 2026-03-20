@@ -719,6 +719,15 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isM
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${value === 'nao_conforme' ? 'bg-red-100 scale-110' : 'bg-slate-100'}`}>👎</div>
                                         Reprovado
                                     </button>
+                                    {item.config?.has_na && (
+                                        <button
+                                            onClick={() => onChange('na')}
+                                            className={`flex-1 py-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-2 ${value === 'na' ? 'border-slate-400 bg-slate-50 text-slate-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                        >
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${value === 'na' ? 'bg-slate-200 scale-110' : 'bg-slate-100'}`}>➖</div>
+                                            N/A
+                                        </button>
+                                    )}
                                 </>
                             ) :
                                 /* LOGIC: Smile 3 (Faces) */
@@ -745,6 +754,15 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isM
                                             <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-lg shadow-sm">😟</div>
                                             Ruim
                                         </button>
+                                        {item.config?.has_na && (
+                                            <button
+                                                onClick={() => onChange('na')}
+                                                className={`flex-1 py-3 rounded-lg border-2 font-bold text-xs transition-all flex flex-col items-center gap-1 ${value === 'na' ? 'border-slate-500 bg-slate-50 text-slate-700' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-lg shadow-sm">➖</div>
+                                                N/A
+                                            </button>
+                                        )}
                                     </>
                                 ) :
                                     item.config?.input_style === 'happy_sad' ? (
@@ -763,6 +781,15 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isM
                                                 <div className="text-4xl">☹️</div>
                                                 <span className="text-sm font-bold">Triste</span>
                                             </button>
+                                            {item.config?.has_na && (
+                                                <button
+                                                    onClick={() => onChange('na')}
+                                                    className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${value === 'na' ? 'border-slate-500 bg-slate-50 text-slate-600' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                                >
+                                                    <div className="text-4xl">➖</div>
+                                                    <span className="text-sm font-bold">N/A</span>
+                                                </button>
+                                            )}
                                         </div>
                                     ) :
                                         item.config?.input_style === 'n_s' ? (
@@ -780,13 +807,14 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isM
                                                     <span className="text-4xl font-black">S</span>
                                                 </button>
                                                 <div className="flex-1 flex items-center justify-end">
-                                                    {/* Spacer or option for N/A if needed */}
-                                                    <button
-                                                        onClick={() => onChange('na')}
-                                                        className={`h-12 px-4 rounded-lg border flex items-center justify-center transition-all ${value === 'na' ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-transparent border-transparent text-slate-400 hover:text-slate-600'}`}
-                                                    >
-                                                        <span className="font-bold">N/A</span>
-                                                    </button>
+                                                    {item.config?.has_na && (
+                                                        <button
+                                                            onClick={() => onChange('na')}
+                                                            className={`h-12 px-4 rounded-lg border flex items-center justify-center transition-all ${value === 'na' ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-transparent border-transparent text-slate-400 hover:text-slate-600'}`}
+                                                        >
+                                                            <span className="font-bold">N/A</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         ) :
@@ -813,6 +841,11 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isM
                                                     <button onClick={() => onChange('conforme')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'conforme' ? 'border-green-500 bg-green-50' : 'border-slate-100'}`}>
                                                         <span className="text-xl">😄</span>
                                                     </button>
+                                                    {item.config?.has_na && (
+                                                        <button onClick={() => onChange('na')} className={`flex-1 py-2 rounded border-2 flex flex-col items-center ${value === 'na' ? 'border-slate-500 bg-slate-50' : 'border-slate-100'}`}>
+                                                            <span className="text-xl">➖</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ) :
                                                 (
@@ -840,12 +873,14 @@ const InspectionItem = ({ item, value, onChange, inspectionId, allowGallery, isM
                                                         >
                                                             {item.config?.scale_type === 'brr' ? 'Ruim' : 'Não'}
                                                         </button>
-                                                        <button
-                                                            onClick={() => onChange('na')}
-                                                            className={`flex-1 h-12 rounded-lg border-2 font-black text-sm transition-all flex items-center justify-center shadow-sm ${value === 'na' ? 'border-slate-400 bg-slate-400 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
-                                                        >
-                                                            N/A
-                                                        </button>
+                                                        {item.config?.has_na && (
+                                                            <button
+                                                                onClick={() => onChange('na')}
+                                                                className={`flex-1 h-12 rounded-lg border-2 font-black text-sm transition-all flex items-center justify-center shadow-sm ${value === 'na' ? 'border-slate-400 bg-slate-400 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-300 bg-white'}`}
+                                                            >
+                                                                N/A
+                                                            </button>
+                                                        )}
                                                     </>
                                                 )}
                         </div>

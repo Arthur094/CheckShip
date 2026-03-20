@@ -24,9 +24,13 @@ export function calculateChecklistScore(
         // Itens diretos da área
         area.items.forEach(item => {
             if (shouldScoreItem(item)) {
-                totalItems++;
-                maxPoints += 10; // Cada item vale 10 pontos base
-                earnedPoints += getPointsForItem(item, responses[item.id]?.answer);
+                const answerStr = String(responses[item.id]?.answer || '').toLowerCase();
+                // Excluir N/A do cálculo de pontuação
+                if (answerStr !== 'na' && answerStr !== 'n/a') {
+                    totalItems++;
+                    maxPoints += 10; // Cada item vale 10 pontos base
+                    earnedPoints += getPointsForItem(item, responses[item.id]?.answer);
+                }
             }
         });
 
@@ -34,9 +38,13 @@ export function calculateChecklistScore(
         area.sub_areas.forEach(sub => {
             sub.items.forEach(item => {
                 if (shouldScoreItem(item)) {
-                    totalItems++;
-                    maxPoints += 10;
-                    earnedPoints += getPointsForItem(item, responses[item.id]?.answer);
+                    const answerStr = String(responses[item.id]?.answer || '').toLowerCase();
+                    // Excluir N/A do cálculo de pontuação
+                    if (answerStr !== 'na' && answerStr !== 'n/a') {
+                        totalItems++;
+                        maxPoints += 10;
+                        earnedPoints += getPointsForItem(item, responses[item.id]?.answer);
+                    }
                 }
             });
         });

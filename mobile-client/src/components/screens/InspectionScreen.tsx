@@ -392,16 +392,20 @@ const InspectionScreen: React.FC = () => {
                     return (
                       <div className="flex gap-2">
                         {/* Padrão (Texto) - only show when no scale_type or input_style is defined */}
-                        {effectiveStyle === 'default' && ['Conforme', 'Não Conforme', 'N/A'].map((opt) => (
+                        {effectiveStyle === 'default' && [
+                          { label: 'Conforme', value: 'Conforme' },
+                          { label: 'Não Conforme', value: 'Não Conforme' },
+                          ...(item.config?.has_na ? [{ label: 'N/A', value: 'na' }] : [])
+                        ].map((opt) => (
                           <button
-                            key={opt}
-                            onClick={() => setAnswers({ ...answers, [item.id]: createAnswer(opt) })}
-                            className={`flex-1 py-3 rounded-lg border text-xs font-bold transition-all ${answers[item.id]?.answer === opt
-                              ? (opt === 'Não Conforme' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-900 text-white border-blue-900')
+                            key={opt.value}
+                            onClick={() => setAnswers({ ...answers, [item.id]: createAnswer(opt.value) })}
+                            className={`flex-1 py-3 rounded-lg border text-xs font-bold transition-all ${answers[item.id]?.answer === opt.value
+                              ? (opt.value === 'Não Conforme' ? 'bg-red-600 text-white border-red-600' : (opt.value === 'na' ? 'bg-slate-400 text-white border-slate-400' : 'bg-blue-900 text-white border-blue-900'))
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                               }`}
                           >
-                            {opt}
+                            {opt.label}
                           </button>
                         ))}
 
@@ -426,15 +430,17 @@ const InspectionScreen: React.FC = () => {
                             >
                               <ThumbsDown size={24} fill={answers[item.id]?.answer === 'Não Conforme' ? "currentColor" : "none"} />
                             </button>
-                            <button
-                              onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('N/A') })}
-                              className={`w-16 py-4 rounded-xl border-2 flex items-center justify-center transition-all ${answers[item.id]?.answer === 'N/A'
-                                ? 'bg-slate-100 border-slate-400 text-slate-700'
-                                : 'bg-white border-slate-200 text-slate-400'
-                                }`}
-                            >
-                              <span className="font-bold text-xs">N/A</span>
-                            </button>
+                            {item.config?.has_na && (
+                              <button
+                                onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('na') })}
+                                className={`w-16 py-4 rounded-xl border-2 flex items-center justify-center transition-all ${answers[item.id]?.answer === 'na'
+                                  ? 'bg-slate-100 border-slate-400 text-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-400'
+                                  }`}
+                              >
+                                <span className="font-bold text-xs">N/A</span>
+                              </button>
+                            )}
                           </>
                         )}
 
@@ -479,6 +485,19 @@ const InspectionScreen: React.FC = () => {
                               <Frown size={32} />
                               <span className="text-[10px] font-bold">Ruim</span>
                             </button>
+
+                            {item.config?.has_na && (
+                              <button
+                                onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('na') })}
+                                className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'na'
+                                  ? 'bg-slate-50 border-slate-500 text-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-400'
+                                  }`}
+                              >
+                                <div className="text-3xl font-bold flex items-center justify-center h-[32px]">➖</div>
+                                <span className="text-[10px] font-bold">N/A</span>
+                              </button>
+                            )}
                           </>
                         )}
 
@@ -506,6 +525,19 @@ const InspectionScreen: React.FC = () => {
                               <Frown size={32} />
                               <span className="text-[10px] font-bold">Ruim</span>
                             </button>
+
+                            {item.config?.has_na && (
+                              <button
+                                onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('na') })}
+                                className={`flex-1 py-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'na'
+                                  ? 'bg-slate-50 border-slate-500 text-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-400'
+                                  }`}
+                              >
+                                <div className="text-3xl font-bold flex items-center justify-center h-[32px]">➖</div>
+                                <span className="text-[10px] font-bold">N/A</span>
+                              </button>
+                            )}
                           </>
                         )}
 
@@ -533,6 +565,19 @@ const InspectionScreen: React.FC = () => {
                               <div className="text-4xl">☹️</div>
                               <span className="text-[10px] font-bold">Triste</span>
                             </button>
+
+                            {item.config?.has_na && (
+                              <button
+                                onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('na') })}
+                                className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'na'
+                                  ? 'bg-slate-50 border-slate-500 text-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-400'
+                                  }`}
+                              >
+                                <div className="text-4xl">➖</div>
+                                <span className="text-[10px] font-bold">N/A</span>
+                              </button>
+                            )}
                           </>
                         )}
 
@@ -558,6 +603,18 @@ const InspectionScreen: React.FC = () => {
                             >
                               <span className="text-4xl font-black">S</span>
                             </button>
+                            
+                            {item.config?.has_na && (
+                              <button
+                                onClick={() => setAnswers({ ...answers, [item.id]: createAnswer('na') })}
+                                className={`flex-1 py-4 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${answers[item.id]?.answer === 'na'
+                                  ? 'bg-slate-100 border-slate-400 text-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-400'
+                                  }`}
+                              >
+                                <span className="font-bold text-xs uppercase tracking-widest">N/A</span>
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
