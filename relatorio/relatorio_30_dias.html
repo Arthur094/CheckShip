@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Operacional 30 Dias - CheckShip</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #0f2b46;
+            --primary-light: #1a4971;
+            --accent: #2196F3;
+            --accent-light: #E3F2FD;
+            --success: #10B981;
+            --success-light: #D1FAE5;
+            --warning: #F59E0B;
+            --warning-light: #FEF3C7;
+            --danger: #EF4444;
+            --danger-light: #FEE2E2;
+            --gray-50: #F8FAFC;
+            --gray-100: #F1F5F9;
+            --gray-200: #E2E8F0;
+            --gray-300: #CBD5E1;
+            --gray-400: #94A3B8;
+            --gray-500: #64748B;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1E293B;
+            --gray-900: #0F172A;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--gray-800);
+            background: white;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        @page {
+            size: A4;
+            margin: 15mm 15mm 20mm 15mm;
+        }
+
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .page-break { page-break-before: always; }
+            .no-break { page-break-inside: avoid; }
+        }
+
+        /* ======= COVER PAGE ======= */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 50%, var(--accent) 100%);
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .cover::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -30%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(33,150,243,0.15) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .cover-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover-logo {
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+        }
+
+        .cover-logo span {
+            color: var(--accent);
+        }
+
+        .cover-subtitle {
+            font-size: 13px;
+            font-weight: 300;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0.8;
+            margin-bottom: 60px;
+        }
+
+        .cover-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .cover-period {
+            font-size: 16px;
+            font-weight: 300;
+            opacity: 0.9;
+            margin-bottom: 6px;
+        }
+
+        .cover-company {
+            font-size: 14px;
+            font-weight: 400;
+            opacity: 0.7;
+        }
+
+        .cover-footer {
+            position: absolute;
+            bottom: 30px;
+            font-size: 10px;
+            opacity: 0.5;
+            z-index: 1;
+        }
+
+        /* ======= CONTENT PAGES ======= */
+        .content {
+            padding: 0;
+        }
+
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .section-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.3px;
+        }
+
+        /* ======= KPI CARDS ======= */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .kpi-card.blue::before { background: var(--accent); }
+        .kpi-card.green::before { background: var(--success); }
+        .kpi-card.orange::before { background: var(--warning); }
+        .kpi-card.red::before { background: var(--danger); }
+        .kpi-card.dark::before { background: var(--primary); }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--gray-900);
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+
+        .kpi-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .kpi-sub {
+            font-size: 9px;
+            color: var(--gray-400);
+            margin-top: 2px;
+        }
+
+        /* ======= TABLES ======= */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10.5px;
+        }
+
+        thead th {
+            background: var(--primary);
+            color: white;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        thead th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        thead th:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        tbody td {
+            padding: 7px 12px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        tbody tr:nth-child(even) {
+            background: var(--gray-50);
+        }
+
+        tbody tr:hover {
+            background: var(--accent-light);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: var(--success-light);
+            color: #065F46;
+        }
+
+        .badge-warning {
+            background: var(--warning-light);
+            color: #92400E;
+        }
+
+        .badge-danger {
+            background: var(--danger-light);
+            color: #991B1B;
+        }
+
+        /* ======= CONFORMITY GAUGE ======= */
+        .conformity-box {
+            background: linear-gradient(135deg, #F0FDF4, #ECFDF5);
+            border: 1px solid #BBF7D0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .conformity-value {
+            font-size: 52px;
+            font-weight: 800;
+            color: var(--success);
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        .conformity-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #065F46;
+            margin-top: 4px;
+        }
+
+        .conformity-detail {
+            font-size: 10px;
+            color: var(--gray-500);
+            margin-top: 8px;
+        }
+
+        .conformity-bar {
+            width: 100%;
+            height: 12px;
+            background: var(--danger-light);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .conformity-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #34D399);
+            border-radius: 6px;
+            width: 99.5%;
+        }
+
+        /* ======= CHART-LIKE BAR ======= */
+        .bar-chart {
+            margin: 8px 0;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+
+        .bar-label {
+            width: 48px;
+            font-size: 9px;
+            color: var(--gray-500);
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 14px;
+            background: var(--gray-100);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #64B5F6);
+            border-radius: 4px;
+            min-width: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 4px;
+        }
+
+        .bar-fill-value {
+            font-size: 8px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .bar-fill.peak {
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        }
+
+        .bar-fill.weekend {
+            background: linear-gradient(90deg, var(--gray-300), var(--gray-400));
+        }
+
+        /* ======= TWO COLUMN LAYOUT ======= */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* ======= INSIGHT BOX ======= */
+        .insights {
+            background: var(--accent-light);
+            border: 1px solid #BBDEFB;
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+
+        .insights-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .insight-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 10.5px;
+            line-height: 1.5;
+        }
+
+        .insight-icon {
+            flex-shrink: 0;
+            font-size: 12px;
+        }
+
+        /* ======= EVOLUTION CARDS ======= */
+        .evo-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .evo-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .evo-week {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .evo-value {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 2px 0;
+        }
+
+        .evo-detail {
+            font-size: 8px;
+            color: var(--gray-400);
+        }
+
+        .evo-growth {
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--success);
+            margin-top: 2px;
+        }
+
+        /* ======= PAGE HEADER ======= */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--gray-200);
+            margin-bottom: 24px;
+        }
+
+        .page-header-logo {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .page-header-logo span {
+            color: var(--accent);
+        }
+
+        .page-header-info {
+            font-size: 9px;
+            color: var(--gray-400);
+            text-align: right;
+        }
+
+        /* ======= RANKING ======= */
+        .rank-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .rank-1 { background: #FEF3C7; color: #92400E; }
+        .rank-2 { background: var(--gray-200); color: var(--gray-700); }
+        .rank-3 { background: #FED7AA; color: #9A3412; }
+        .rank-other { background: var(--gray-100); color: var(--gray-500); }
+
+        .footer-note {
+            margin-top: 30px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-200);
+            font-size: 9px;
+            color: var(--gray-400);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============ COVER PAGE ============ -->
+    <div class="cover">
+        <div class="cover-content">
+            <div class="cover-logo">Check<span>Ship</span></div>
+            <div class="cover-subtitle">Plataforma de Inspeção Veicular</div>
+
+            <div class="cover-title">Relatório Operacional</div>
+            <div class="cover-period">30 Dias de Operação</div>
+            <div class="cover-period">05/02/2026 — 06/03/2026</div>
+            <div class="cover-company" style="margin-top: 20px;">Transportadora Rolim</div>
+        </div>
+        <div class="cover-footer">Gerado automaticamente em 06/03/2026 às 16:00 — CheckShip v1.0</div>
+    </div>
+
+    <!-- ============ PAGE 2: RESUMO EXECUTIVO ============ -->
+    <div class="page-break"></div>
+    <div class="content">
+        <div class="page-header">
+            <div class="page-header-logo">Check<span>Ship</span></div>
+            <div class="page-header-info">Relatório 30 Dias • Transportadora Rolim<br>05/02/2026 — 06/03/2026</div>
+        </div>
+
+        <div class="section no-break">
+            <div class="section-header">
+                <div class="section-icon">📊</div>
+                <div class="section-title">Resumo Executivo</div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card blue">
+                    <div class="kpi-value">1.356</div>
+                    <div class="kpi-label">Inspeções Realizadas</div>
+                    <div class="kpi-sub">99,6% concluídas</div>
+                </div>
+                <div class="kpi-card dark">
+                    <div class="kpi-value">42</div>
+                    <div class="kpi-label">Inspetores Ativos</div>
+                    <div class="kpi-sub">de 56 motoristas</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-value">99,5%</div>
+                    <div class="kpi-label">Taxa de Conformidade</div>
+                    <div class="kpi-sub">23.558 de 23.683 itens</div>
+                </div>
+                <div class="kpi-card orange">
+                    <div class="kpi-value">~45</div>
+                    <div class="kpi-label">Média Diária</div>
+                    <div class="kpi-sub">inspeções/dia</div>
+                </div>
+                <div class="kpi-card blue">
+                    <div class="kpi-value">38</div>
+                    <div class="kpi-label">Veículos Inspecionados</div>
+                    <div class="kpi-sub">de 59 ativos</div>
+                </div>
+                <div class="kpi-card green">
+                    <div class="kpi-value">+558%</div>
+                    <div class="kpi-label">Crescimento Semanal</div>
+                    <div class="kpi-sub">55 → 362 inspeções/semana</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- USERS & FLEET -->
+        <div class="two-col">
+            <div class="section no-break">
+                <div class="section-header">
+                    <div class="section-icon">👥</div>
+                    <div class="section-title">Usuários</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>Perfil</th><th class="text-right">Qtd</th><th class="text-right">%</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Motoristas</td><td class="text-right"><strong>56</strong></td><td class="text-right">75,7%</td></tr>
+                        <tr><td>Gestores</td><td class="text-right"><strong>16</strong></td><td class="text-right">21,6%</td></tr>
+                        <tr><td>Outros</td><td class="text-right"><strong>2</strong></td><td class="text-right">2,7%</td></tr>
+                        <tr style="background: var(--accent-light);"><td><strong>Total</strong></td><td class="text-right"><strong>74</strong></td><td class="text-right"><span class="badge badge-success">100% ativos</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section no-break">
+                <div class="section-header">
+                    <div class="section-icon">🚛</div>
+                    <div class="section-title">Frota</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>Ativo</th><th class="text-right">Total</th><th class="text-right">Ativos</th><th class="text-right">Inativos</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Veículos</td><td class="text-right">78</td><td class="text-right"><span class="badge badge-success">59</span></td><td class="text-right"><span class="badge badge-warning">19</span></td></tr>
+                        <tr><td>Carretas</td><td class="text-right">89</td><td class="text-right"><span class="badge badge-success">89</span></td><td class="text-right">0</td></tr>
+                        <tr style="background: var(--accent-light);"><td><strong>Total Frota</strong></td><td class="text-right"><strong>167</strong></td><td class="text-right"><strong>148</strong></td><td class="text-right"><strong>19</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- CONFORMITY -->
+        <div class="section no-break" style="margin-top: 24px;">
+            <div class="section-header">
+                <div class="section-icon">✅</div>
+                <div class="section-title">Conformidade e Não Conformidade</div>
+            </div>
+
+            <div class="two-col">
+                <div class="conformity-box">
+                    <div class="conformity-value">99,5%</div>
+                    <div class="conformity-label">Taxa de Conformidade Geral</div>
+                    <div class="conformity-bar">
+                        <div class="conformity-bar-fill"></div>
+                    </div>
+                    <div class="conformity-detail" style="margin-top: 8px;">
+                        ✅ 23.558 itens conformes &nbsp;|&nbsp; ⚠️ 125 itens não conformes
+                    </div>
+                </div>
+
+                <div>
+                    <table>
+                        <thead>
+                            <tr><th>Resposta</th><th class="text-right">Contagem</th><th class="text-center">Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Bom</td><td class="text-right">19.199</td><td class="text-center"><span class="badge badge-success">Conforme</span></td></tr>
+                            <tr><td>Sim</td><td class="text-right">2.741</td><td class="text-center"><span class="badge badge-success">Conforme</span></td></tr>
+                            <tr><td>Conforme</td><td class="text-right">1.399</td><td class="text-center"><span class="badge badge-success">Conforme</span></td></tr>
+                            <tr><td>Negativo (Bafômetro)</td><td class="text-right">219</td><td class="text-center"><span class="badge badge-success">Conforme</span></td></tr>
+                            <tr><td>Não</td><td class="text-right">125</td><td class="text-center"><span class="badge badge-danger">Não Conforme</span></td></tr>
+                            <tr><td>N/A</td><td class="text-right">7</td><td class="text-center"><span class="badge badge-warning">N/A</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ PAGE 3: EVOLUÇÃO & CHECKLISTS ============ -->
+    <div class="page-break"></div>
+    <div class="content">
+        <div class="page-header">
+            <div class="page-header-logo">Check<span>Ship</span></div>
+            <div class="page-header-info">Relatório 30 Dias • Transportadora Rolim<br>05/02/2026 — 06/03/2026</div>
+        </div>
+
+        <!-- WEEKLY EVOLUTION -->
+        <div class="section no-break">
+            <div class="section-header">
+                <div class="section-icon">📈</div>
+                <div class="section-title">Evolução Semanal</div>
+            </div>
+
+            <div class="evo-grid">
+                <div class="evo-card">
+                    <div class="evo-week">Semana 1</div>
+                    <div class="evo-value">55</div>
+                    <div class="evo-detail">13 inspetores • 11 veículos</div>
+                </div>
+                <div class="evo-card">
+                    <div class="evo-week">Semana 2</div>
+                    <div class="evo-value">341</div>
+                    <div class="evo-detail">28 inspetores • 25 veículos</div>
+                    <div class="evo-growth">▲ +520%</div>
+                </div>
+                <div class="evo-card">
+                    <div class="evo-week">Semana 3</div>
+                    <div class="evo-value">286</div>
+                    <div class="evo-detail">28 inspetores • 24 veículos</div>
+                    <div class="evo-growth" style="color: var(--warning);">▼ -16%</div>
+                </div>
+                <div class="evo-card">
+                    <div class="evo-week">Semana 4</div>
+                    <div class="evo-value">312</div>
+                    <div class="evo-detail">31 inspetores • 25 veículos</div>
+                    <div class="evo-growth">▲ +9%</div>
+                </div>
+                <div class="evo-card" style="border-color: var(--accent); background: var(--accent-light);">
+                    <div class="evo-week">Semana 5</div>
+                    <div class="evo-value" style="color: var(--accent);">362</div>
+                    <div class="evo-detail">33 inspetores • 31 veículos</div>
+                    <div class="evo-growth">▲ +16%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAILY VOLUME -->
+        <div class="section no-break">
+            <div class="section-header">
+                <div class="section-icon">📅</div>
+                <div class="section-title">Volume Diário de Inspeções</div>
+            </div>
+
+            <div class="bar-chart">
+                <div class="bar-row"><div class="bar-label">05/02</div><div class="bar-track"><div class="bar-fill" style="width:30%"><span class="bar-fill-value">25</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">06/02</div><div class="bar-track"><div class="bar-fill weekend" style="width:5%"><span class="bar-fill-value">4</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">07/02</div><div class="bar-track"><div class="bar-fill" style="width:24%"><span class="bar-fill-value">20</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">08/02</div><div class="bar-track"><div class="bar-fill weekend" style="width:7%"><span class="bar-fill-value">6</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">09/02</div><div class="bar-track"><div class="bar-fill" style="width:70%"><span class="bar-fill-value">57</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">10/02</div><div class="bar-track"><div class="bar-fill" style="width:71%"><span class="bar-fill-value">58</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">11/02</div><div class="bar-track"><div class="bar-fill" style="width:54%"><span class="bar-fill-value">44</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">12/02</div><div class="bar-track"><div class="bar-fill" style="width:66%"><span class="bar-fill-value">54</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">13/02</div><div class="bar-track"><div class="bar-fill" style="width:80%"><span class="bar-fill-value">66</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">14/02</div><div class="bar-track"><div class="bar-fill" style="width:55%"><span class="bar-fill-value">45</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">15/02</div><div class="bar-track"><div class="bar-fill weekend" style="width:21%"><span class="bar-fill-value">17</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">16/02</div><div class="bar-track"><div class="bar-fill" style="width:54%"><span class="bar-fill-value">44</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">17/02</div><div class="bar-track"><div class="bar-fill weekend" style="width:12%"><span class="bar-fill-value">10</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">18/02</div><div class="bar-track"><div class="bar-fill" style="width:73%"><span class="bar-fill-value">60</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">19/02</div><div class="bar-track"><div class="bar-fill" style="width:85%"><span class="bar-fill-value">70</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">20/02</div><div class="bar-track"><div class="bar-fill" style="width:66%"><span class="bar-fill-value">54</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">21/02</div><div class="bar-track"><div class="bar-fill" style="width:40%"><span class="bar-fill-value">33</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">22/02</div><div class="bar-track"><div class="bar-fill weekend" style="width:18%"><span class="bar-fill-value">15</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">23/02</div><div class="bar-track"><div class="bar-fill" style="width:79%"><span class="bar-fill-value">65</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">24/02</div><div class="bar-track"><div class="bar-fill" style="width:59%"><span class="bar-fill-value">48</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">25/02</div><div class="bar-track"><div class="bar-fill" style="width:73%"><span class="bar-fill-value">60</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">26/02</div><div class="bar-track"><div class="bar-fill" style="width:56%"><span class="bar-fill-value">46</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">27/02</div><div class="bar-track"><div class="bar-fill" style="width:63%"><span class="bar-fill-value">52</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">28/02</div><div class="bar-track"><div class="bar-fill" style="width:35%"><span class="bar-fill-value">29</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">01/03</div><div class="bar-track"><div class="bar-fill weekend" style="width:15%"><span class="bar-fill-value">12</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">02/03</div><div class="bar-track"><div class="bar-fill" style="width:87%"><span class="bar-fill-value">71</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">03/03</div><div class="bar-track"><div class="bar-fill" style="width:67%"><span class="bar-fill-value">55</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">04/03</div><div class="bar-track"><div class="bar-fill peak" style="width:100%"><span class="bar-fill-value">82 🏆</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">05/03</div><div class="bar-track"><div class="bar-fill peak" style="width:98%"><span class="bar-fill-value">80</span></div></div></div>
+                <div class="bar-row"><div class="bar-label">06/03</div><div class="bar-track"><div class="bar-fill" style="width:90%"><span class="bar-fill-value">74</span></div></div></div>
+            </div>
+            <div style="font-size: 9px; color: var(--gray-400); margin-top: 4px;">
+                <span style="display:inline-block;width:10px;height:10px;background:linear-gradient(90deg, var(--accent), #64B5F6);border-radius:2px;"></span> Dia útil &nbsp;&nbsp;
+                <span style="display:inline-block;width:10px;height:10px;background:linear-gradient(90deg, var(--gray-300), var(--gray-400));border-radius:2px;"></span> Fim de semana &nbsp;&nbsp;
+                <span style="display:inline-block;width:10px;height:10px;background:linear-gradient(90deg, var(--primary), var(--primary-light));border-radius:2px;"></span> Pico
+            </div>
+        </div>
+
+        <!-- CHECKLISTS -->
+        <div class="section no-break" style="margin-top: 20px;">
+            <div class="section-header">
+                <div class="section-icon">📋</div>
+                <div class="section-title">Checklists Mais Utilizados</div>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>#</th><th>Template</th><th class="text-right">Aplicações</th><th class="text-right">% do Total</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>1ª Etapa — Bafômetro | Motorista</td><td class="text-right"><strong>460</strong></td><td class="text-right">33,9%</td></tr>
+                    <tr><td>2</td><td>2ª Etapa — Detecção de Fadiga | Motorista</td><td class="text-right"><strong>431</strong></td><td class="text-right">31,8%</td></tr>
+                    <tr><td>3</td><td>3ª Etapa — Checklist Diário (Pré-viagem)</td><td class="text-right"><strong>424</strong></td><td class="text-right">31,3%</td></tr>
+                    <tr><td>4</td><td>Auditoria de Veículo | SSMA</td><td class="text-right">18</td><td class="text-right">1,3%</td></tr>
+                    <tr><td>5</td><td>Auditoria de Motorista | SSMA</td><td class="text-right">11</td><td class="text-right">0,8%</td></tr>
+                    <tr><td>6</td><td>Checklist Periódico de Veículo | Motorista</td><td class="text-right">9</td><td class="text-right">0,7%</td></tr>
+                    <tr><td>7</td><td>Avaliação de Risco — Cliente | SSMA</td><td class="text-right">1</td><td class="text-right">0,1%</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============ PAGE 4: RANKINGS & INSIGHTS ============ -->
+    <div class="page-break"></div>
+    <div class="content">
+        <div class="page-header">
+            <div class="page-header-logo">Check<span>Ship</span></div>
+            <div class="page-header-info">Relatório 30 Dias • Transportadora Rolim<br>05/02/2026 — 06/03/2026</div>
+        </div>
+
+        <div class="two-col">
+            <!-- TOP INSPECTORS -->
+            <div class="section no-break">
+                <div class="section-header">
+                    <div class="section-icon">🏆</div>
+                    <div class="section-title">Top 10 Inspetores</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>#</th><th>Inspetor</th><th class="text-right">Insp.</th><th class="text-center">Conclusão</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="rank-num rank-1">1</span></td><td>Rogério F. L. dos Santos</td><td class="text-right"><strong>82</strong></td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-2">2</span></td><td>Carlos Aleandro dos Santos</td><td class="text-right"><strong>77</strong></td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-3">3</span></td><td>Raimundo Duarte Neto</td><td class="text-right"><strong>69</strong></td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">4</span></td><td>Antonio V. dos Santos Filho</td><td class="text-right">67</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">5</span></td><td>Ian Lenon B. Santana</td><td class="text-right">61</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">6</span></td><td>Genegilson Barros Sousa</td><td class="text-right">59</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">7</span></td><td>Antonio L. Oliveira da Silva</td><td class="text-right">59</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">8</span></td><td>Ronald das Neves Silva</td><td class="text-right">59</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">9</span></td><td>Micernandes O. Fernandes</td><td class="text-right">58</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                        <tr><td><span class="rank-num rank-other">10</span></td><td>Edney Araujo Ribeiro</td><td class="text-right">57</td><td class="text-center"><span class="badge badge-success">100%</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TOP VEHICLES -->
+            <div class="section no-break">
+                <div class="section-header">
+                    <div class="section-icon">🚗</div>
+                    <div class="section-title">Top 10 Veículos</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>#</th><th>Placa</th><th class="text-right">Inspeções</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><span class="rank-num rank-1">1</span></td><td><strong>ROV7B66</strong></td><td class="text-right"><strong>134</strong></td></tr>
+                        <tr><td><span class="rank-num rank-2">2</span></td><td><strong>OJB4648</strong></td><td class="text-right"><strong>86</strong></td></tr>
+                        <tr><td><span class="rank-num rank-3">3</span></td><td><strong>ROV7B70</strong></td><td class="text-right"><strong>83</strong></td></tr>
+                        <tr><td><span class="rank-num rank-other">4</span></td><td>ROY5J60</td><td class="text-right">82</td></tr>
+                        <tr><td><span class="rank-num rank-other">5</span></td><td>ROY6H96</td><td class="text-right">76</td></tr>
+                        <tr><td><span class="rank-num rank-other">6</span></td><td>SMR3A89</td><td class="text-right">73</td></tr>
+                        <tr><td><span class="rank-num rank-other">7</span></td><td>PSY5076</td><td class="text-right">69</td></tr>
+                        <tr><td><span class="rank-num rank-other">8</span></td><td>ROV7B60</td><td class="text-right">60</td></tr>
+                        <tr><td><span class="rank-num rank-other">9</span></td><td>SNJ9G31</td><td class="text-right">59</td></tr>
+                        <tr><td><span class="rank-num rank-other">10</span></td><td>ROF0B51</td><td class="text-right">59</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- INSIGHTS -->
+        <div class="section" style="margin-top: 24px;">
+            <div class="section-header">
+                <div class="section-icon">💡</div>
+                <div class="section-title">Insights e Recomendações</div>
+            </div>
+
+            <div class="insights">
+                <div class="insight-item">
+                    <span class="insight-icon">📈</span>
+                    <span><strong>Adoção crescente:</strong> O sistema saiu de 55 inspeções/semana para 362, mostrando adoção orgânica forte e crescente por parte da equipe.</span>
+                </div>
+                <div class="insight-item">
+                    <span class="insight-icon">✅</span>
+                    <span><strong>Conformidade excelente:</strong> Taxa de 99,5% demonstra alto nível de manutenção e aderência aos padrões de segurança.</span>
+                </div>
+                <div class="insight-item">
+                    <span class="insight-icon">🔄</span>
+                    <span><strong>Workflow consolidado:</strong> As 3 etapas (Bafômetro → Fadiga → Pré-viagem) representam 97% das inspeções, operando como esperado.</span>
+                </div>
+                <div class="insight-item">
+                    <span class="insight-icon">🔧</span>
+                    <span><strong>19 veículos inativos:</strong> Verificar se são veículos em manutenção ou se devem ser reativados para aumentar a cobertura.</span>
+                </div>
+                <div class="insight-item">
+                    <span class="insight-icon">👤</span>
+                    <span><strong>14 motoristas sem engajamento:</strong> 75% dos motoristas cadastrados estão utilizando o sistema. Os restantes podem precisar de treinamento ou incentivo.</span>
+                </div>
+                <div class="insight-item">
+                    <span class="insight-icon">⚠️</span>
+                    <span><strong>125 itens não conformes:</strong> Embora representem apenas 0,5%, é recomendável rastrear individualmente para identificar padrões recorrentes.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            Este relatório foi gerado automaticamente pela plataforma <strong>CheckShip</strong> em 06/03/2026 às 16:00.<br>
+            Dados extraídos do banco de produção referentes ao período de 05/02/2026 a 06/03/2026.<br>
+            © 2026 CheckShip — Plataforma de Inspeção Veicular
+        </div>
+    </div>
+
+</body>
+</html>

@@ -26,6 +26,10 @@ import ReleaseFlowDetail from './src/features/workflows/ReleaseFlowDetail';
 import Branches from './src/features/branches/Branches';
 import Trailers from './src/features/trailers/Trailers';
 import DocManagementDashboard from './src/features/documents/DocManagementDashboard';
+import RoutineComplianceReport from './src/features/reports/RoutineComplianceReport';
+import DriverPerformanceReport from './src/features/reports/DriverPerformanceReport';
+import FleetWearReport from './src/features/reports/FleetWearReport';
+import DocAlertsReport from './src/features/reports/DocAlertsReport';
 
 
 
@@ -125,6 +129,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialTab = 'dashboard' }) => 
         return <Branches />;
       case 'config-trailers':
         return <Trailers />;
+      case 'report-compliance':
+        return <RoutineComplianceReport />;
+      case 'report-driver':
+        return <DriverPerformanceReport />;
+      case 'report-fleet':
+        return <FleetWearReport />;
+      case 'report-docs':
+        return <DocAlertsReport />;
       case 'config-models':
         return (
           <ChecklistList

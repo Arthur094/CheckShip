@@ -34,6 +34,7 @@ export const NAV_ITEMS = [
     label: 'Relatórios Automáticos',
     icon: <BarChart3 size={20} />,
     children: [
+      { id: 'report-compliance', label: 'Conformidade por Rotina' },
       { id: 'report-driver', label: 'Desempenho por Motorista' },
       { id: 'report-fleet', label: 'Desgaste de Frota' },
       { id: 'report-docs', label: 'Alertas de Documentação' },

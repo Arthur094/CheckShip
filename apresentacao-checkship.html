@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apresentação Comercial - CheckShip</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+
+        .slide {
+            width: 297mm;
+            /* A4 Landscape (11.69 inches) */
+            height: 210mm;
+            /* A4 Landscape (8.27 inches) */
+            background: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            margin: 0 auto 20mm auto;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            page-break-after: always;
+        }
+
+        .slide-content {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 40px 60px;
+        }
+
+        /* CheckShip Brand Colors */
+        .color-primary {
+            color: #1e3a8a;
+        }
+
+        /* blue-900 */
+        .bg-primary {
+            background-color: #1e3a8a;
+        }
+
+        /* blue-900 */
+
+        .slide-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #0f172a;
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+
+        .slide-subtitle {
+            font-size: 1.5rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        ul.custom-ul {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 2rem;
+        }
+
+        ul.custom-ul li {
+            font-size: 1.25rem;
+            color: #334155;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            line-height: 1.6;
+        }
+
+        ul.custom-ul li::before {
+            content: "✓";
+            color: #1e3a8a;
+            font-weight: bold;
+            display: inline-block;
+            width: 1.5em;
+            margin-left: -1em;
+            font-size: 1.5rem;
+            margin-right: 0.5rem;
+            margin-top: -0.2rem;
+        }
+
+        @media print {
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+            }
+
+            #controls {
+                display: none !important;
+            }
+
+            .slide {
+                margin: 0 !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                width: 297mm !important;
+                height: 210mm !important;
+                page-break-after: always !important;
+            }
+
+            @page {
+                size: A4 landscape;
+                margin: 0;
+            }
+        }
+    </style>
+    <!-- HTML2PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+
+<body class="py-10">
+
+    <!-- Controls -->
+    <div id="controls" class="fixed top-6 right-6 z-50 flex gap-4">
+        <button onclick="exportToPDF()" id="btn-export" title="Gerar PDF da Apresentação"
+            class="bg-blue-900 hover:bg-blue-800 text-white font-bold p-3 rounded-full shadow-lg flex items-center justify-center transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                <path d="M10.4 12.6a2 2 0 1 1 3 3L8 21l-4 1 1-4Z" />
+                <path d="M18 21v-8a2 2 0 0 0-2-2h-3" />
+                <path d="M21 8.5 15.5 3H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h5.5" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Presentation Container -->
+    <div id="presentation-container">
+
+        <!-- Slide 1: Capa -->
+        <div class="slide bg-slate-900 text-white border-none" style="background-color: #0f172a;">
+            <div class="slide-content justify-center items-center text-center px-20">
+                <div class="mb-12">
+                    <div
+                        class="w-24 h-24 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                        <span class="text-white font-black text-5xl">CS</span>
+                    </div>
+                    <h2 class="text-3xl font-black tracking-[0.2em] text-blue-400 uppercase">CheckShip</h2>
+                </div>
+                <h1 class="text-6xl font-black mb-6 leading-tight tracking-tight">Eleve o padrão da sua operação
+                    logística com previsibilidade e compliance.</h1>
+                <p class="text-2xl text-slate-400 font-medium">Gestão de frotas e inspeções sem falhas, sem papel e com
+                    controle total – onde a sua operação estiver.</p>
+            </div>
+        </div>
+
+        <!-- Slide 2: Problema -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="flex items-center gap-3 mb-8">
+                    <div
+                        class="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center font-bold text-xl">
+                        01</div>
+                    <span class="text-xl font-bold text-slate-400 uppercase tracking-widest">O Desafio Oculto</span>
+                </div>
+                <h2 class="slide-title">O que não é medido, gera prejuízo e retrabalho.</h2>
+                <div class="flex-1 flex mt-8">
+                    <div class="w-2/3 pr-10">
+                        <ul class="custom-ul">
+                            <li>Falta de previsibilidade sobre o estado real da frota antes que a viagem inicie.</li>
+                            <li>Processos amarrados ao papel e ferramentas genéricas lentas.</li>
+                            <li>Dificuldade real em garantir o cumprimento rigoroso de normas, auditorias (ISO) e
+                                compliance na ponta.</li>
+                            <li>Decisões operacionais tomadas com base em "achismos" em vez de dados concretos em tempo
+                                real.</li>
+                        </ul>
+                    </div>
+                    <div class="w-1/3 flex items-center justify-center relative mt-6">
+                        <!-- Background Blobs -->
+                        <div class="absolute w-64 h-64 bg-red-100 rounded-full mix-blend-multiply filter blur-2xl opacity-70 animate-blob"></div>
+                        <div class="absolute w-64 h-64 bg-orange-100 rounded-full mix-blend-multiply filter blur-2xl opacity-70 animate-blob animation-delay-2000 translate-x-12"></div>
+                        
+                        <!-- Illustration Container -->
+                        <div class="relative w-full aspect-square max-w-[320px] flex items-center justify-center">
+                            
+                            <!-- Card 1: Pilha de Papel (Burocracia/Lentidão) -->
+                            <div class="absolute bg-white p-4 rounded-xl shadow-lg border border-slate-200 transform -rotate-6 -translate-x-8 -translate-y-8 w-48 z-10 opacity-90">
+                                <div class="w-24 h-3 bg-slate-200 rounded mb-3"></div>
+                                <div class="w-full h-2 bg-slate-100 rounded mb-2"></div>
+                                <div class="w-3/4 h-2 bg-slate-100 rounded mb-2"></div>
+                                <div class="w-full h-2 bg-slate-100 rounded mb-4"></div>
+                                <div class="flex justify-end"><div class="w-8 h-8 rounded-full bg-red-100 text-red-500 flex items-center justify-center font-bold text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div></div>
+                            </div>
+                            
+                            <!-- Card 2: Achismo / Falta de Informação -->
+                            <div class="absolute bg-white p-4 rounded-xl shadow-lg border border-slate-200 transform rotate-12 translate-x-12 -translate-y-4 w-52 z-20">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-orange-600"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
+                                    <div class="font-bold text-slate-700 text-sm">Status da Frota</div>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2.5 mb-2">
+                                  <div class="bg-slate-300 h-2.5 rounded-full w-[45%]"></div>
+                                </div>
+                                <span class="text-xs font-bold text-slate-400">Informação Incompleta</span>
+                            </div>
+
+                            <!-- Card 3: Prejuízo Financeiro (Principal) -->
+                            <div class="absolute bg-white p-5 rounded-2xl shadow-xl border-t-4 border-t-red-500 transform translate-y-12 z-30 w-64">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h4 class="font-bold text-slate-800">Custo Operacional</h4>
+                                    <span class="bg-red-100 text-red-700 text-xs font-black px-2 py-1 rounded-md flex items-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V2"/><path d="m5 15 7 7 7-7"/></svg>
+                                        24%
+                                    </span>
+                                </div>
+                                <div class="h-24 w-full flex items-end justify-between gap-2">
+                                    <div class="w-full bg-slate-100 rounded-t-sm h-1/4"></div>
+                                    <div class="w-full bg-slate-200 rounded-t-sm h-2/4"></div>
+                                    <div class="w-full bg-slate-300 rounded-t-sm h-3/4"></div>
+                                    <div class="w-full bg-red-400 rounded-t-sm h-full relative">
+                                        <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-slate-100 text-center">
+                                    <span class="text-sm font-bold text-red-600">Custos Invisíveis Escalando</span>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Solução -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="flex items-center gap-3 mb-8">
+                    <div
+                        class="w-12 h-12 bg-blue-100 text-blue-900 rounded-lg flex items-center justify-center font-bold text-xl">
+                        02</div>
+                    <span class="text-xl font-bold text-slate-400 uppercase tracking-widest">A Solução Integrada</span>
+                </div>
+                <h2 class="slide-title">CheckShip: O sistema definitivo para rotinas de inspeção de alto padrão.</h2>
+                <div class="flex-1 flex mt-8">
+                    <div class="w-1/2 pr-12 flex flex-col justify-center">
+                        <ul class="space-y-8">
+                            <li class="flex items-start gap-4">
+                                <span class="bg-blue-100 p-1.5 rounded-full mt-1 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-900"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <div>
+                                    <h4 class="font-bold text-xl text-slate-800 mb-1">Digitalização Total</h4>
+                                    <p class="text-slate-600 text-lg">Levamos suas rotinas de checklist do pátio à rodovia, direto para o celular do colaborador.</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-4">
+                                <span class="bg-blue-100 p-1.5 rounded-full mt-1 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-900"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <div>
+                                    <h4 class="font-bold text-xl text-slate-800 mb-1">Rigor Operacional</h4>
+                                    <p class="text-slate-600 text-lg">Garantimos que processos e normas de altíssima exigência sejam cumpridos à risca.</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-4">
+                                <span class="bg-blue-100 p-1.5 rounded-full mt-1 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-900"><polyline points="20 6 9 17 4 12"/></svg></span>
+                                <div>
+                                    <h4 class="font-bold text-xl text-slate-800 mb-1">Ponte Base-Ponta</h4>
+                                    <p class="text-slate-600 text-lg">A integração perfeita e imediata entre quem executa (na ponta) e quem gerencia (na base).</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="w-1/2 bg-blue-50 rounded-2xl relative overflow-visible border border-blue-100 p-8 flex items-center justify-center -mr-8 mt-4 mb-4">
+                        <div class="absolute inset-0 bg-blue-900/5 rounded-2xl"></div>
+                        
+                        <!-- Dashboard Mockup bg -->
+                        <div class="absolute -right-4 top-8 w-full h-[85%] bg-white rounded-xl shadow-[0_10px_40px_-15px_rgba(30,58,138,0.4)] border border-slate-200 overflow-hidden transform rotate-2">
+                             <img src="./img_dashboard.png" class="w-full h-full object-cover object-left-top opacity-95" onerror="this.style.display='none'">
+                        </div>
+                        
+                        <!-- Mobile Mockup fg -->
+                        <div class="absolute -left-12 bottom-4 w-52 h-[340px] bg-slate-800 rounded-3xl border-[10px] border-slate-800 shadow-[0_-10px_40px_-5px_rgba(30,58,138,0.6)] overflow-hidden transform -rotate-6 transition-transform hover:rotate-0 hover:-translate-y-4 duration-500 z-10 flex flex-col">
+                             <div class="w-full h-6 bg-slate-800 shrink-0 relative flex justify-center items-start pt-1">
+                                 <div class="w-1/2 h-3 bg-black rounded-b-lg"></div>
+                             </div>
+                             <div class="w-full flex-1 bg-white relative overflow-hidden">
+                                 <img src="./img_mobile_list.png" class="w-full h-auto pb-4" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-full h-full flex flex-col text-center items-center justify-center bg-white text-slate-400 font-bold p-2 text-xs\'>img_mobile_list.png</div>'">
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Visão 360 -->
+        <div class="slide">
+            <div class="slide-content bg-slate-50">
+                <div class="flex items-center gap-3 mb-8">
+                    <div
+                        class="w-12 h-12 bg-blue-900 text-white rounded-lg flex items-center justify-center font-bold text-xl">
+                        03</div>
+                    <span class="text-xl font-bold text-slate-400 uppercase tracking-widest">Painel de Controle</span>
+                </div>
+                <h2 class="slide-title">Visão 360º em Tempo Real (Dashboard)</h2>
+                <p class="slide-subtitle mb-8">Controle absoluto da sua frota em uma única tela.</p>
+
+                <div class="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col">
+                    <div class="grid grid-cols-3 gap-6 mb-8">
+                        <div class="bg-blue-50 p-6 rounded-xl border border-blue-100">
+                            <h4 class="text-blue-900 font-bold mb-1">Decisões Rápidas</h4>
+                            <p class="text-sm text-blue-700">Identifique gargalos e itens reprovados instantaneamente.
+                            </p>
+                        </div>
+                        <div class="bg-green-50 p-6 rounded-xl border border-green-100">
+                            <h4 class="text-green-900 font-bold mb-1">Ação Preventiva</h4>
+                            <p class="text-sm text-green-700">Aja com precisão antes que o problema se torne custo
+                                imprevisto.</p>
+                        </div>
+                        <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                            <h4 class="text-indigo-900 font-bold mb-1">Centralização</h4>
+                            <p class="text-sm text-indigo-700">Todos os dados da operação, caminhões e motoristas em um
+                                só lugar.</p>
+                        </div>
+                    </div>
+                    <!-- Real Dashboard Screenshot -->
+                    <div class="flex-1 bg-slate-100 rounded-xl border-2 border-slate-200 p-2 shadow-inner relative overflow-hidden">
+                        <div class="w-full h-full bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                            <img src="./img_dashboard.png" alt="Dashboard Operacional" class="w-full h-full object-cover object-left-top" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 font-bold p-8 text-center\'>Salve a imagem do Dashboard como img_dashboard.png na mesma pasta deste arquivo</div>'">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: Execução Offline -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="flex items-center gap-3 mb-8">
+                    <div
+                        class="w-12 h-12 bg-blue-900 text-white rounded-lg flex items-center justify-center font-bold text-xl">
+                        04</div>
+                    <span class="text-xl font-bold text-slate-400 uppercase tracking-widest">No Pátio ou na Rota</span>
+                </div>
+                <h2 class="slide-title">Compliance e Rigor na Ponta (App Offline)</h2>
+
+                <div class="flex-1 flex mt-8 bg-slate-900 text-white rounded-2xl overflow-hidden shadow-xl">
+                    <div class="w-1/2 p-12 flex flex-col justify-center">
+                        <h3 class="text-3xl font-black mb-6 text-blue-400">Execução perfeita, mesmo sem internet.</h3>
+                        <ul class="space-y-6">
+                            <li class="flex items-start gap-4">
+                                <span class="bg-blue-600 p-2 rounded-lg mt-1 shrink-0"><svg
+                                        xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="text-white">
+                                        <path d="m2 1 22 22" />
+                                        <path
+                                            d="m20.66 17-.31 1.25a5 5 0 0 1-5.64 3.65l-5.46-1.09a5 5 0 0 1-3.65-5.64l1.25-6.24" />
+                                        <path d="M14.71 9 16 3.82a5 5 0 0 1 5.64-3.65l1.1.22" />
+                                        <path d="m5 11 1.83-1.83" />
+                                    </svg></span>
+                                <div>
+                                    <h4 class="font-bold text-lg">Sistema Offline Resiliente</h4>
+                                    <p class="text-slate-400 text-sm mt-1">As inspeções não param quando o sinal cai. O
+                                        App salva localmente e sincroniza quando a rede volta.</p>
+                                </div>
+                            </li>
+                            <li class="flex items-start gap-4">
+                                <span class="bg-blue-600 p-2 rounded-lg mt-1 shrink-0"><svg
+                                        xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="text-white">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        <path d="m9 12 2 2 4-4" />
+                                    </svg></span>
+                                <div>
+                                    <h4 class="font-bold text-lg">Auditoria Blindada (Itens Obrigatórios)</h4>
+                                    <p class="text-slate-400 text-sm mt-1">Travas de sistema impedem inspeções pela
+                                        metade, garantindo total conformidade no campo.</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="w-1/2 bg-blue-950 flex items-center justify-center p-8 relative">
+                        <!-- Mockup smartphone -->
+                        <div
+                            class="w-64 h-full bg-slate-800 rounded-[2.5rem] border-8 border-slate-700 p-2 shadow-2xl relative">
+                            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-700 rounded-b-xl z-20">
+                            </div>
+                            <div class="w-full h-full bg-white rounded-3xl overflow-hidden relative">
+                                <img src="./img_mobile_form.png" alt="App Mobile" class="w-full h-auto" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-full h-full flex flex-col text-center items-center justify-center bg-slate-100 text-slate-400 font-bold p-4\'>Salve a imagem do Checklist como img_mobile_form.png</div>'">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: ISO -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="flex items-center gap-3 mb-8">
+                    <div
+                        class="w-12 h-12 bg-blue-900 text-white rounded-lg flex items-center justify-center font-bold text-xl">
+                        05</div>
+                    <span class="text-xl font-bold text-slate-400 uppercase tracking-widest">Segurança Jurídica</span>
+                </div>
+                <h2 class="slide-title">Histórico Ilimitado e Padrão ISO</h2>
+
+                <div class="flex-1 flex mt-8 gap-10">
+                    <div class="w-1/2 flex flex-col justify-center">
+                        <div
+                            class="bg-white border-l-8 border-blue-900 shadow-md p-6 pl-8 rounded-xl mb-8 relative overflow-hidden">
+                            <h3 class="text-2xl font-black text-slate-800 relative z-10">Rastreabilidade completa para
+                                certificações e auditorias.</h3>
+                        </div>
+
+                        <div class="space-y-8">
+                            <div class="flex gap-4 items-start">
+                                <div
+                                    class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        <path d="m9 12 2 2 4-4" />
+                                    </svg>
+                                </div>
+                                <div class="pt-1">
+                                    <h4 class="font-bold text-xl mb-1">Adequação Imediata</h4>
+                                    <p class="text-slate-600">Aderência automática às exigências da ISO, SASSMAQ e demais
+                                        normativas legais de segurança.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div
+                                    class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-900 font-bold shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="7 10 12 15 17 10" />
+                                        <line x1="12" x2="12" y1="15" y2="3" />
+                                    </svg>
+                                </div>
+                                <div class="pt-1">
+                                    <h4 class="font-bold text-xl mb-1">Fim do Arquivo Morto</h4>
+                                    <p class="text-slate-600">Histórico de inspeções salvo na nuvem de forma segura e com acesso
+                                        vitalício.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-1/2 bg-slate-100 rounded-xl border-2 border-slate-200 p-2 shadow-inner h-full">
+                        <div class="w-full h-[320px] bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                            <img src="./img_history.png" alt="Histórico de Checklists" class="w-full h-full object-cover object-left-top" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'w-full h-full flex flex-col text-center items-center justify-center bg-slate-100 text-slate-400 font-bold p-8\'>Salve a imagem de Checklists Realizados como img_history.png</div>'">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Parceria Estratégica -->
+        <div class="slide">
+            <div class="slide-content bg-gradient-to-br from-blue-900 to-blue-950 text-white">
+                <div class="flex items-center gap-3 mb-8">
+                    <div
+                        class="w-12 h-12 bg-yellow-500 text-blue-900 rounded-lg flex items-center justify-center font-bold text-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2v20" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold text-blue-200 uppercase tracking-widest">Condição Exclusiva</span>
+                </div>
+
+                <h2 class="text-5xl font-black mb-4">Construindo a ferramenta perfeita, juntos.</h2>
+                <p class="text-2xl text-blue-300 font-medium mb-10">Programa Estratégico para Early Adopters.</p>
+
+                <div class="grid grid-cols-2 gap-x-12 gap-y-8 flex-1 content-center">
+                    <div class="flex gap-4">
+                        <div class="shrink-0 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500">
+                                <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" />
+                                <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" />
+                                <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+                            </svg></div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-2 text-white">Vagas Limitadas</h3>
+                            <p class="text-blue-200 leading-relaxed">Estamos selecionando a dedo um grupo exclusivo de
+                                empresas para nossa fase inicial. Você não é um número, é um parceiro de evolução.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <div class="shrink-0 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500">
+                                <path d="m18 16 4-4-4-4" />
+                                <path d="m6 8-4 4 4 4" />
+                                <path d="m14.5 4-5 16" />
+                            </svg></div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-2 text-white">Moldado para a Sua Dor</h3>
+                            <p class="text-blue-200 leading-relaxed">Feedback direto de quem opera. Suas sugestões viram
+                                melhorias reais no sistema em curtíssimo tempo. O sistema se molda a você.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <div class="shrink-0 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                <path d="m9 12 2 2 4-4" />
+                            </svg></div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-2 text-white">Vantagens Exclusivas</h3>
+                            <p class="text-blue-200 leading-relaxed">Condições inatingíveis no futuro: Isenção total de
+                                taxa de implantação e suporte VIP (acompanhamento muito próximo da nossa equipe
+                                técnica).</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <div class="shrink-0 mt-1"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500">
+                                <path d="M17 14V2" />
+                                <path d="M9 14.12 2.88 20.24a2 2 0 0 0 2.83 2.83l6.36-6.36" />
+                                <path d="M12 12a2 2 0 1 0-4-4 2 2 0 0 0 4 4Z" />
+                                <path d="M22 6.5 15.5 13H5" />
+                                <path d="M4.5 12.5 11 6h11" />
+                            </svg></div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-2 text-white">Crescimento Mútuo</h3>
+                            <p class="text-blue-200 leading-relaxed">Uma experiência ganha-ganha onde o seu feedback
+                                constante esculpe a plataforma que vai trazer extrema excelência para sua frota.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Fechamento (CTA) -->
+        <div class="slide">
+            <div class="slide-content justify-center items-center text-center">
+                <div
+                    class="w-20 h-20 bg-blue-100 text-blue-900 rounded-full flex items-center justify-center font-bold mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <path d="m9 11 3 3L22 4" />
+                    </svg>
+                </div>
+                <h2 class="text-5xl font-black text-slate-900 mb-6">Vamos transformar a rotina da sua frota hoje. Sem
+                    riscos.</h2>
+                <div class="bg-blue-50 border border-blue-200 p-8 rounded-2xl max-w-3xl mb-12 shadow-sm">
+                    <h3 class="text-2xl font-bold text-blue-900 mb-2">Proposta Exclusiva de Acolhimento</h3>
+                    <p class="text-xl text-blue-700">20 dias de experiência imersiva na sua operação.</p>
+
+                    <ul class="text-left mt-8 space-y-4 text-blue-800 font-medium">
+                        <li class="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" width="18"
+                                height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-blue-600">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg> Vamos rodar o sistema e acompanhar a sua equipe de perto.</li>
+                        <li class="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" width="18"
+                                height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-blue-600">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg> Identificaremos falhas e mediremos os ganhos tangíveis rapidamente.</li>
+                        <li class="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" width="18"
+                                height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                stroke-linecap="round" stroke-linejoin="round" class="text-blue-600">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg> Construção colaborativa do seu sucesso logístico.</li>
+                    </ul>
+                </div>
+
+                <h4 class="text-2xl font-black text-slate-800 border-b-4 border-yellow-500 pb-2 inline-block">Em quais
+                    veículos podemos iniciar o teste na semana que vem?</h4>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Export Script -->
+    <script>
+        function exportToPDF() {
+            const element = document.getElementById('presentation-container');
+            const btn = document.getElementById('btn-export');
+            const originalHTML = btn.innerHTML;
+
+            // Loading state: Spinner icon
+            btn.innerHTML = `<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.disabled = true;
+
+            const opt = {
+                margin: 0,
+                filename: 'Apresentacao-Comercial-CheckShip.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true, 
+                    allowTaint: true,
+                    // Garante que o html2canvas consiga renderizar as bordas CSS e cantos arredondados antes do scroll
+                    windowWidth: document.getElementById('presentation-container').scrollWidth,
+                    windowHeight: document.getElementById('presentation-container').scrollHeight 
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            // Remove box-shadow and margins for PDF generation using a cloned element
+            // to prevent the original UI from blinking or looking messy on screen
+            
+            // First delay a bit to allow the spinner to render
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.disabled = false;
+                }).catch(err => {
+                    console.error("Erro ao gerar PDF: ", err);
+                    alert("Ocorreu um erro ao gerar o PDF. Verifique o console para mais detalhes.");
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.disabled = false;
+                });
+            }, 100);
+        }
+    </script>
+</body>
+
+</html>
