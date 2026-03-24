@@ -3,7 +3,7 @@ import { ChevronDown, Search } from 'lucide-react';
 
 interface MultiSelectDropdownProps {
     title: string;
-    options: Array<{ id: string; label: string }>;
+    options: Array<{ id: string; label: string; inactive?: boolean }>;
     selected: string[];
     onChange: (selected: string[]) => void;
     searchPlaceholder?: string;
@@ -116,7 +116,7 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                             filteredOptions.map((option) => (
                                 <label
                                     key={option.id}
-                                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0"
+                                    className={`flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-100 last:border-b-0 ${option.inactive ? 'opacity-50 grayscale bg-slate-50/50' : ''}`}
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <input
@@ -127,6 +127,7 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                                     />
                                     <span className="text-sm text-slate-700 flex-1">
                                         {option.label}
+                                        {option.inactive && <span className="ml-2 text-[10px] uppercase font-bold text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded">Inativo</span>}
                                     </span>
                                 </label>
                             ))

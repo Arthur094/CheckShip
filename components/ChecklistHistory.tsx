@@ -63,8 +63,8 @@ const ChecklistHistory: React.FC = () => {
   const [filters, setFilters] = useState({
     status: [] as string[],   // Empty = all statuses
     periodType: 'started_at',
-    startDate: '',            // Empty = no start date filter
-    endDate: '',              // Empty = no end date filter  
+    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
     code: '',
     vehicleTypes: [] as string[],
     vehicles: [] as string[],
@@ -100,17 +100,22 @@ const ChecklistHistory: React.FC = () => {
     try {
       const [vTypes, vecs, tpls, usrs, brns] = await Promise.all([
         supabase.from('vehicle_types').select('id, name').order('name'),
-        supabase.from('vehicles').select('id, plate, branch_id').order('plate'),
+        supabase.from('vehicles').select('id, plate, branch_id, active').order('plate'),
         supabase.from('checklist_templates').select('id, name').order('name'),
         supabase.from('profiles').select('id, full_name').order('full_name'),
         supabase.from('branches').select('id, name').eq('active', true).order('name')
       ]);
 
+      const uniqueTpls = new Map();
+      (tpls.data || []).forEach(t => {
+        if (!uniqueTpls.has(t.name)) uniqueTpls.set(t.name, t.name);
+      });
+
       setFilterOptions(prev => ({
         ...prev,
         vehicleTypes: (vTypes.data || []).map(x => ({ id: x.name, label: x.name })),
-        vehicles: (vecs.data || []).map(x => ({ id: x.id, label: x.plate, branch_id: x.branch_id })),
-        checklists: (tpls.data || []).map(x => ({ id: x.id, label: x.name })),
+        vehicles: (vecs.data || []).map(x => ({ id: x.id, label: x.plate, inactive: !x.active, branch_id: x.branch_id })),
+        checklists: Array.from(uniqueTpls.keys()).map(name => ({ id: name, label: name })),
         users: (usrs.data || []).map(x => ({ id: x.id, label: x.full_name })),
         branches: (brns.data || []).map(x => ({ id: x.id, label: x.name })),
       }));
@@ -125,7 +130,7 @@ const ChecklistHistory: React.FC = () => {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('checklist_inspections')
         .select(`
           id,
@@ -139,7 +144,81 @@ const ChecklistHistory: React.FC = () => {
           vehicle_id,
           checklist_template_id,
           inspector_id
-        `, { count: 'exact' })
+        `, { count: 'exact' });
+
+      // Apply Period filters
+      if (filters.startDate) {
+        query = query.gte(filters.periodType || 'started_at', `${filters.startDate}T00:00:00.000Z`);
+      }
+      if (filters.endDate) {
+        query = query.lte(filters.periodType || 'started_at', `${filters.endDate}T23:59:59.999Z`);
+      }
+
+      // Apply Status filters
+      if (filters.status.length > 0) {
+        const statusOrs: string[] = [];
+        if (filters.status.includes('Finalizado')) {
+            statusOrs.push('and(status.eq.completed,analysis_status.neq.approved,analysis_status.neq.rejected)');
+            // Also include if analysis_status is null
+            statusOrs.push('and(status.eq.completed,analysis_status.is.null)');
+        }
+        if (filters.status.includes('Aprovado')) statusOrs.push('and(status.eq.completed,analysis_status.eq.approved)');
+        if (filters.status.includes('Reprovado')) {
+            statusOrs.push('status.eq.rejected');
+            statusOrs.push('analysis_status.eq.rejected');
+        }
+        if (filters.status.includes('Em Análise')) statusOrs.push('status.eq.pending');
+        if (filters.status.includes('Em Andamento')) statusOrs.push('status.eq.in_progress');
+        if (statusOrs.length > 0) {
+            query = query.or(statusOrs.join(','));
+        }
+      }
+
+      // Apply Code filter
+      if (filters.code) {
+        const cleanCode = filters.code.replace(/#/g, '').trim();
+        if (cleanCode) {
+          (query as any).filter('id::text', 'ilike', `%${cleanCode}%`);
+        }
+      }
+
+      // Fetch related IDs for nested filters
+      // 1. Templates by Name
+      if (filters.checklists.length > 0) {
+        const { data: tData } = await supabase.from('checklist_templates').select('id').in('name', filters.checklists);
+        const tIds = (tData || []).map(t => t.id);
+        query = query.in('checklist_template_id', tIds.length > 0 ? tIds : ['none']);
+      }
+
+      // 2. Inspector and User Roles
+      if (filters.users.length > 0 || filters.userTypes.length > 0) {
+        let uQuery = supabase.from('profiles').select('id');
+        if (filters.users.length > 0) uQuery = uQuery.in('id', filters.users);
+        if (filters.userTypes.length > 0) uQuery = uQuery.in('role', filters.userTypes);
+        const { data: uData } = await uQuery;
+        const uIds = (uData || []).map(u => u.id);
+        query = query.in('inspector_id', uIds.length > 0 ? uIds : ['none']);
+      }
+
+      // 3. Vehicles by ID, Type, Branch
+      if (filters.vehicles.length > 0 || filters.vehicleTypes.length > 0 || filters.branches.length > 0) {
+        let vQuery = supabase.from('vehicles').select('id, vehicle_type_id');
+        if (filters.vehicles.length > 0) vQuery = vQuery.in('id', filters.vehicles);
+        if (filters.branches.length > 0) vQuery = vQuery.in('branch_id', filters.branches);
+        const { data: vData } = await vQuery;
+        let validV = vData || [];
+        
+        if (filters.vehicleTypes.length > 0) {
+           const { data: vtData } = await supabase.from('vehicle_types').select('id, name').in('name', filters.vehicleTypes);
+           const vtIds = (vtData || []).map(vt => vt.id);
+           validV = validV.filter(v => vtIds.includes(v.vehicle_type_id));
+        }
+        
+        const vIds = validV.map(v => v.id);
+        query = query.in('vehicle_id', vIds.length > 0 ? vIds : ['none']);
+      }
+
+      const { data, error, count } = await query
         .order('started_at', { ascending: false })
         .range(from, to);
 
@@ -327,11 +406,6 @@ const ChecklistHistory: React.FC = () => {
     { id: 'Reprovado', label: 'Reprovado' }
   ];
 
-  const platformOptions = [
-    { id: 'IOS', label: 'IOS' },
-    { id: 'Android', label: 'Android' },
-    { id: 'Web', label: 'Web' }
-  ];
 
   return (
     <div className="p-8 space-y-6 animate-in slide-in-from-right duration-300 pb-24" onClick={() => { setActiveMenuId(null); setActiveFilterDropdown(null); setShowPerPageDropdown(false); }}>
@@ -346,22 +420,25 @@ const ChecklistHistory: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4" onClick={e => e.stopPropagation()}>
         {/* Top Row: Status, Period, Dates */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MultiSelectDropdown
-            title="Status"
-            options={statusOptions}
-            selected={filters.status}
-            onChange={s => setFilters({ ...filters, status: s })}
-            isOpen={activeFilterDropdown === 'status'}
-            onToggle={() => handleToggleFilter('status')}
-          />
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase block">Status</label>
+            <MultiSelectDropdown
+              title="Status"
+              options={statusOptions}
+              selected={filters.status}
+              onChange={s => setFilters({ ...filters, status: s })}
+              isOpen={activeFilterDropdown === 'status'}
+              onToggle={() => handleToggleFilter('status')}
+            />
+          </div>
 
-          <div className="relative">
-            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Período</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase block">Período</label>
             <div className="relative">
               <select
                 value={filters.periodType}
                 onChange={e => setFilters({ ...filters, periodType: e.target.value })}
-                className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer"
+                className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer"
               >
                 {periodTypeOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -371,26 +448,26 @@ const ChecklistHistory: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative">
-            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">De:</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase block">De:</label>
             <div className="relative">
               <input
                 type="date"
                 value={filters.startDate}
                 onChange={e => setFilters({ ...filters, startDate: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
               />
             </div>
           </div>
 
-          <div className="relative">
-            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Até:</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase block">Até:</label>
             <div className="relative">
               <input
                 type="date"
                 value={filters.endDate}
                 onChange={e => setFilters({ ...filters, endDate: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
               />
             </div>
           </div>
@@ -411,81 +488,92 @@ const ChecklistHistory: React.FC = () => {
         {showAdvancedFilters && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200 pt-2 border-t border-slate-50 mt-2">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Código da avaliação</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Código da avaliação</label>
               <input
                 type="text"
                 placeholder="Buscar ID..."
                 value={filters.code}
                 onChange={e => setFilters({ ...filters, code: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-100 outline-none"
               />
             </div>
 
-            <MultiSelectDropdown
-              title="Tipo de Operação"
-              options={filterOptions.vehicleTypes}
-              selected={filters.vehicleTypes}
-              onChange={s => setFilters({ ...filters, vehicleTypes: s })}
-              isOpen={activeFilterDropdown === 'vehicleTypes'}
-              onToggle={() => handleToggleFilter('vehicleTypes')}
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Tipo de Operação</label>
+              <MultiSelectDropdown
+                title="Tipos"
+                options={filterOptions.vehicleTypes}
+                selected={filters.vehicleTypes}
+                onChange={s => setFilters({ ...filters, vehicleTypes: s })}
+                isOpen={activeFilterDropdown === 'vehicleTypes'}
+                onToggle={() => handleToggleFilter('vehicleTypes')}
+              />
+            </div>
 
-            <MultiSelectDropdown
-              title="Veículo"
-              options={filterOptions.vehicles}
-              selected={filters.vehicles}
-              onChange={s => setFilters({ ...filters, vehicles: s })}
-              isOpen={activeFilterDropdown === 'vehicles'}
-              onToggle={() => handleToggleFilter('vehicles')}
-              searchPlaceholder="Buscar veículo..."
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Veículo</label>
+              <MultiSelectDropdown
+                title="Veículos"
+                options={filterOptions.vehicles}
+                selected={filters.vehicles}
+                onChange={s => setFilters({ ...filters, vehicles: s })}
+                isOpen={activeFilterDropdown === 'vehicles'}
+                onToggle={() => handleToggleFilter('vehicles')}
+                searchPlaceholder="Buscar veículo..."
+              />
+            </div>
 
-            <MultiSelectDropdown
-              title="Checklist"
-              options={filterOptions.checklists}
-              selected={filters.checklists}
-              onChange={s => setFilters({ ...filters, checklists: s })}
-              isOpen={activeFilterDropdown === 'checklists'}
-              onToggle={() => handleToggleFilter('checklists')}
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Checklist</label>
+              <MultiSelectDropdown
+                title="Checklists"
+                options={filterOptions.checklists}
+                selected={filters.checklists}
+                onChange={s => setFilters({ ...filters, checklists: s })}
+                isOpen={activeFilterDropdown === 'checklists'}
+                onToggle={() => handleToggleFilter('checklists')}
+              />
+            </div>
 
-            <MultiSelectDropdown
-              title="Tipo de Usuário"
-              options={filterOptions.userTypes}
-              selected={filters.userTypes}
-              onChange={s => setFilters({ ...filters, userTypes: s })}
-              isOpen={activeFilterDropdown === 'userTypes'}
-              onToggle={() => handleToggleFilter('userTypes')}
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Tipo de Usuário</label>
+              <MultiSelectDropdown
+                title="Tipos"
+                options={filterOptions.userTypes}
+                selected={filters.userTypes}
+                onChange={s => setFilters({ ...filters, userTypes: s })}
+                isOpen={activeFilterDropdown === 'userTypes'}
+                onToggle={() => handleToggleFilter('userTypes')}
+              />
+            </div>
 
-            <MultiSelectDropdown
-              title="Usuário"
-              options={filterOptions.users}
-              selected={filters.users}
-              onChange={s => setFilters({ ...filters, users: s })}
-              isOpen={activeFilterDropdown === 'users'}
-              onToggle={() => handleToggleFilter('users')}
-              searchPlaceholder="Buscar usuário..."
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Usuário</label>
+              <MultiSelectDropdown
+                title="Usuários"
+                options={filterOptions.users}
+                selected={filters.users}
+                onChange={s => setFilters({ ...filters, users: s })}
+                isOpen={activeFilterDropdown === 'users'}
+                onToggle={() => handleToggleFilter('users')}
+                searchPlaceholder="Buscar usuário..."
+              />
+            </div>
 
-            <MultiSelectDropdown
-              title="Plataforma"
-              options={platformOptions}
-              selected={filters.platform}
-              onChange={s => setFilters({ ...filters, platform: s })}
-              isOpen={activeFilterDropdown === 'platform'}
-              onToggle={() => handleToggleFilter('platform')}
-            />
 
-            <MultiSelectDropdown
-              title="Filial"
-              options={filterOptions.branches}
-              selected={filters.branches}
-              onChange={s => setFilters({ ...filters, branches: s })}
-              isOpen={activeFilterDropdown === 'branches'}
-              onToggle={() => handleToggleFilter('branches')}
-              searchPlaceholder="Buscar filial..."
-            />
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase block">Filial</label>
+              <MultiSelectDropdown
+                title="Filiais"
+                options={filterOptions.branches}
+                selected={filters.branches}
+                onChange={s => setFilters({ ...filters, branches: s })}
+                isOpen={activeFilterDropdown === 'branches'}
+                onToggle={() => handleToggleFilter('branches')}
+                searchPlaceholder="Buscar filial..."
+              />
+            </div>
           </div>
         )}
 

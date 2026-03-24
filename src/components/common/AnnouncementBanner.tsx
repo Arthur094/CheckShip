@@ -100,15 +100,17 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ platform }) => 
     };
 
     return (
-        <div className={`${getStyles()} px-4 py-3 shadow-md relative z-[100] animate-in slide-in-from-top duration-300`}>
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 font-medium text-sm md:text-base">
-                    <span className="shrink-0">{getIcon()}</span>
-                    <p>{announcement.message}</p>
+        <div className={`${getStyles()} px-4 py-3 shadow-md relative z-[100] animate-in slide-in-from-top duration-300 overflow-hidden`}>
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 relative">
+                <div className="flex-1 overflow-hidden relative flex">
+                    <div className="flex items-center gap-3 font-medium text-sm md:text-base animate-marquee whitespace-nowrap">
+                        <span className="shrink-0">{getIcon()}</span>
+                        <p>{announcement.message}</p>
+                    </div>
                 </div>
                 <button
                     onClick={handleDismiss}
-                    className="p-1 hover:bg-white/20 rounded-full transition-colors shrink-0"
+                    className="p-1 hover:bg-white/20 rounded-full transition-colors shrink-0 z-10"
                     aria-label="Fechar aviso"
                 >
                     <X size={18} />

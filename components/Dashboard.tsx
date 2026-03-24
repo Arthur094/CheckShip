@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Truck, ClipboardCheck, TrendingUp,
   CheckCircle2, XCircle, Trophy, Medal, Star, AlertTriangle,
-  Loader2, Activity, BarChart3, Target, Gauge
+  Loader2, Activity, BarChart3, Target, Gauge, Filter, FileDown
 } from 'lucide-react';
 import { supabase } from '../src/lib/supabase';
+import { exportDashboardToPDF } from '../src/utils/exportDashboardPDF';
 
 interface DashboardData {
   // KPIs
@@ -59,16 +60,22 @@ const Dashboard: React.FC = () => {
   const [data, setData] = useState<DashboardData>(INITIAL_DATA);
   const [loading, setLoading] = useState(true);
 
+  // Default dates: last 30 days up to today
+  const td = new Date();
+  const [endDate, setEndDate] = useState(td.toISOString().substring(0, 10));
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(td.getDate() - 30);
+  const [startDate, setStartDate] = useState(thirtyDaysAgo.toISOString().substring(0, 10));
+
   useEffect(() => {
     fetchAllData();
-  }, []);
+  }, []); // Initial load
 
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const since = thirtyDaysAgo.toISOString();
+      const fromIso = new Date(`${startDate}T00:00:00`).toISOString();
+      const toIso = new Date(`${endDate}T23:59:59.999`).toISOString();
 
       const [
         profilesRes,
@@ -90,7 +97,8 @@ const Dashboard: React.FC = () => {
         const { data: batch, error: batchErr } = await supabase
           .from('checklist_inspections')
           .select('id, status, started_at, inspector_id, vehicle_id, responses, template_id, checklist_template_id')
-          .gte('started_at', since)
+          .gte('started_at', fromIso)
+          .lte('started_at', toIso)
           .order('started_at', { ascending: true })
           .range(from, from + BATCH_SIZE - 1);
 
@@ -251,31 +259,44 @@ const Dashboard: React.FC = () => {
         inspections: vehicleMap[id],
       }));
 
-      // --- Top Templates ---
-      const templateMap: Record<string, number> = {};
+      // --- Top Templates (grouped by name to merge versions) ---
+      const templateIdCountMap: Record<string, number> = {};
       inspections.forEach(insp => {
         const tid = insp.template_id || insp.checklist_template_id;
-        if (tid) templateMap[tid] = (templateMap[tid] || 0) + 1;
+        if (tid) templateIdCountMap[tid] = (templateIdCountMap[tid] || 0) + 1;
       });
 
-      const topTemplateIds = Object.entries(templateMap)
+      const allTemplateIds = Object.keys(templateIdCountMap);
+      let allTemplateDetails: { id: string; name: string }[] = [];
+
+      // Fetch template names in batches (Supabase .in() has limits)
+      for (let i = 0; i < allTemplateIds.length; i += 50) {
+        const batch = allTemplateIds.slice(i, i + 50);
+        const { data: batchDetails } = await supabase
+          .from('checklist_templates')
+          .select('id, name')
+          .in('id', batch);
+        if (batchDetails) allTemplateDetails = allTemplateDetails.concat(batchDetails);
+      }
+
+      const idToNameMap: Record<string, string> = {};
+      allTemplateDetails.forEach(t => { idToNameMap[t.id] = t.name; });
+
+      // Group counts by template name
+      const nameCountMap: Record<string, number> = {};
+      Object.entries(templateIdCountMap).forEach(([tid, count]) => {
+        const name = idToNameMap[tid] || tid;
+        nameCountMap[name] = (nameCountMap[name] || 0) + count;
+      });
+
+      const topTemplates = Object.entries(nameCountMap)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 7)
-        .map(([id]) => id);
-
-      const { data: templateDetails } = await supabase
-        .from('checklist_templates')
-        .select('id, name')
-        .in('id', topTemplateIds);
-
-      const templateNameMap: Record<string, string> = {};
-      (templateDetails || []).forEach(t => { templateNameMap[t.id] = t.name; });
-
-      const topTemplates = topTemplateIds.map(id => ({
-        name: templateNameMap[id] || id,
-        uses: templateMap[id],
-        percent: total > 0 ? parseFloat(((templateMap[id] / total) * 100).toFixed(1)) : 0,
-      }));
+        .map(([name, uses]) => ({
+          name,
+          uses,
+          percent: total > 0 ? parseFloat(((uses / total) * 100).toFixed(1)) : 0,
+        }));
 
       // --- Growth ---
       setData({
@@ -349,13 +370,51 @@ const Dashboard: React.FC = () => {
   return (
     <div className="p-6 lg:p-8 space-y-8 animate-in fade-in duration-500 max-w-[1600px] mx-auto">
       {/* Header */}
-      <header className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shadow-lg shadow-blue-900/20">
-          <LayoutDashboard size={22} />
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shadow-lg shadow-blue-900/20">
+            <LayoutDashboard size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Dashboard Operacional</h1>
+            <p className="text-slate-500 text-sm">Dados do período: {startDate.split('-').reverse().join('/')} até {endDate.split('-').reverse().join('/')}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Dashboard Operacional</h1>
-          <p className="text-slate-500 text-sm">Últimos 30 dias • Dados em tempo real</p>
+
+        {/* Date Filter */}
+        <div className="flex flex-wrap items-end gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase block">De:</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none w-36"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase block">Até:</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 outline-none w-36"
+            />
+          </div>
+          <button 
+            onClick={fetchAllData}
+            className="bg-blue-900 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-blue-800 transition-colors flex items-center gap-2 h-[38px]"
+          >
+            <Filter size={16} />
+            FILTRAR
+          </button>
+          <button 
+            onClick={() => exportDashboardToPDF(data, startDate, endDate)}
+            className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-red-700 transition-colors flex items-center gap-2 h-[38px]"
+          >
+            <FileDown size={16} />
+            EXPORTAR PDF
+          </button>
         </div>
       </header>
 
@@ -639,7 +698,7 @@ const Dashboard: React.FC = () => {
             <InsightItem icon="🔧" text={`${data.inactiveVehicles} veículos inativos — verificar se estão em manutenção ou devem ser reativados.`} />
           )}
           {data.motoristas > data.uniqueInspectors && (
-            <InsightItem icon="👤" text={`${data.motoristas - data.uniqueInspectors} motoristas sem inspeções nos últimos 30 dias — avaliar necessidade de treinamento.`} />
+            <InsightItem icon="👤" text={`${data.motoristas - data.uniqueInspectors} motoristas sem inspeções no período — avaliar necessidade de treinamento.`} />
           )}
           {data.nonConformItems > 0 && (
             <InsightItem icon="⚠️" text={`${data.nonConformItems.toLocaleString('pt-BR')} itens não conformes registrados — rastrear para identificar padrões recorrentes.`} />
