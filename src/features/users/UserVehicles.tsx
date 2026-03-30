@@ -26,6 +26,7 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
     const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
     const [assignments, setAssignments] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [companyId, setCompanyId] = useState<string | null>(null);
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
@@ -60,6 +61,17 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
 
             // 3. Fetch current assignments for this profile (if it exists)
             if (profileId) {
+                // Fetch Profile to get company_id (important for RLS)
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('company_id')
+                    .eq('id', profileId)
+                    .single();
+
+                if (profileData?.company_id) {
+                    setCompanyId(profileData.company_id);
+                }
+
                 const { data: assignmentsData, error: assignmentsError } = await supabase
                     .from('vehicle_assignments')
                     .select('vehicle_id')
@@ -105,7 +117,11 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                 // Add assignment
                 const { error } = await supabase
                     .from('vehicle_assignments')
-                    .insert({ vehicle_id: vehicleId, profile_id: currentProfileId });
+                    .insert({ 
+                        vehicle_id: vehicleId, 
+                        profile_id: currentProfileId,
+                        company_id: companyId 
+                    });
 
                 if (error) throw error;
 
@@ -165,7 +181,8 @@ const UserVehicles: React.FC<UserVehiclesProps> = ({ profileId, onEnsureExists }
                     .filter(v => !assignments.has(v.id))
                     .map(v => ({
                         vehicle_id: v.id,
-                        profile_id: currentProfileId
+                        profile_id: currentProfileId,
+                        company_id: companyId
                     }));
 
                 if (toAdd.length > 0) {
