@@ -28,7 +28,7 @@ const VehicleSelectScreen: React.FC = () => {
   }, [session?.user?.id]);
 
   const filtered = vehicles.filter(v =>
-    v.plate.toLowerCase().includes(searchTerm.toLowerCase())
+    v && v.plate && v.plate.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

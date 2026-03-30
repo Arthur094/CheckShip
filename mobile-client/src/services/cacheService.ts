@@ -43,7 +43,7 @@ export const cacheService = {
           `)
                     .eq('profile_id', userId)
                     .eq('active', true)
-                    .then((res: any) => res.data?.map((item: any) => item.vehicles) || []),
+                    .then((res: any) => res.data?.map((item: any) => item.vehicles).filter(Boolean) || []),
 
                 // 2. Template assignments by VEHICLE TYPE (for offline filtering)
                 (async () => {
