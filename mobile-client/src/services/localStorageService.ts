@@ -35,6 +35,24 @@ export interface DraftInspection {
 const STORAGE_KEY = 'checkship_pending_inspections';
 const DRAFTS_KEY = 'checkship_draft_inspections';
 
+/**
+ * Strips Base64 data URLs from a responses object.
+ * Replaces imageUrl values starting with 'data:' with '[synced]' to free memory
+ * while preserving the answer structure for reference.
+ */
+export function purgeBase64FromResponses(responses: Record<string, any>): Record<string, any> {
+    const cleaned: Record<string, any> = {};
+    for (const key of Object.keys(responses)) {
+        const val = responses[key];
+        if (val && typeof val === 'object' && typeof val.imageUrl === 'string' && val.imageUrl.startsWith('data:')) {
+            cleaned[key] = { ...val, imageUrl: '[synced]', isOffline: false };
+        } else {
+            cleaned[key] = val;
+        }
+    }
+    return cleaned;
+}
+
 export const localStorageService = {
     // Salvar inspeção pendente
     savePendingInspection(inspection: Omit<PendingInspection, 'id' | 'pending'>): string {
@@ -69,7 +87,7 @@ export const localStorageService = {
         return all.find(i => i.id === id) || null;
     },
 
-    // Remover inspeção pendente (após sincronizar)
+    // Remover inspeção pendente e limpar Base64 associado (após sincronizar)
     removePending(id: string): boolean {
         try {
             const existing = this.getAllPending();
@@ -80,6 +98,31 @@ export const localStorageService = {
         } catch (error) {
             console.error('Erro ao remover inspeção pendente:', error);
             return false;
+        }
+    },
+
+    /**
+     * Strips Base64 imageUrls from ALL pending inspections without removing them.
+     * Call this periodically or after a failed sync attempt to free localStorage space.
+     */
+    purgeAllBase64(): void {
+        try {
+            const existing = this.getAllPending();
+            let changed = false;
+            const cleaned = existing.map(inspection => {
+                if (!inspection.responses) return inspection;
+                const cleanedResponses = purgeBase64FromResponses(inspection.responses);
+                // Only update if something actually changed
+                const didChange = JSON.stringify(cleanedResponses) !== JSON.stringify(inspection.responses);
+                if (didChange) changed = true;
+                return { ...inspection, responses: cleanedResponses };
+            });
+            if (changed) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+                console.log('🧹 Base64 purgado das inspeções pendentes');
+            }
+        } catch (error) {
+            console.error('Erro ao purgar Base64:', error);
         }
     },
 

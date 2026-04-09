@@ -1,9 +1,9 @@
-﻿import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNav from '../BottomNav';
 import { useAuth } from '../../App';
 import { cacheService } from '../../services/cacheService';
-import { localStorageService } from '../../services/localStorageService';
+import { localStorageService, purgeBase64FromResponses } from '../../services/localStorageService';
 import { supabase } from '../../lib/supabase';
 import { Network } from '@capacitor/network';
 
@@ -80,13 +80,16 @@ const CompletedScreen: React.FC = () => {
       const pending = localStorageService.getAllPending().find(p => p.id === pendingId);
       if (!pending) return;
 
+      // Strip Base64 offline images before sending to Supabase
+      const cleanedResponses = purgeBase64FromResponses(pending.responses || {});
+
       const { error } = await supabase
         .from('checklist_inspections')
         .insert({
           checklist_template_id: pending.checklist_template_id,
           vehicle_id: pending.vehicle_id,
           inspector_id: pending.inspector_id,
-          responses: pending.responses,
+          responses: cleanedResponses,
           status: pending.status,
           started_at: pending.started_at,
           completed_at: pending.completed_at
@@ -94,6 +97,7 @@ const CompletedScreen: React.FC = () => {
 
       if (error) throw error;
 
+      // Remove from pending (Base64 freed from localStorage)
       localStorageService.removePending(pendingId);
       alert('✅ Inspeção sincronizada com sucesso!');
       loadCompletedInspections();
@@ -114,13 +118,16 @@ const CompletedScreen: React.FC = () => {
 
     for (const p of pending) {
       try {
+        // Strip Base64 offline images before sending to Supabase
+        const cleanedResponses = purgeBase64FromResponses(p.responses || {});
+
         const { error } = await supabase
           .from('checklist_inspections')
           .insert({
             checklist_template_id: p.checklist_template_id,
             vehicle_id: p.vehicle_id,
             inspector_id: p.inspector_id,
-            responses: p.responses,
+            responses: cleanedResponses,
             status: p.status,
             started_at: p.started_at,
             completed_at: p.completed_at
@@ -128,12 +135,18 @@ const CompletedScreen: React.FC = () => {
 
         if (error) throw error;
 
+        // Remove from pending (Base64 freed from localStorage)
         localStorageService.removePending(p.id);
         synced++;
       } catch (error) {
         console.error('Erro ao sincronizar:', error);
         failed++;
       }
+    }
+
+    // Safety net: purge any remaining Base64 from inspections that failed to sync
+    if (failed > 0) {
+      localStorageService.purgeAllBase64();
     }
 
     setIsSyncing(false);

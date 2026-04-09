@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { driverService } from '../../services/driverService';
 import { supabase } from '../../lib/supabase';
-import { localStorageService } from '../../services/localStorageService';
+import { localStorageService, purgeBase64FromResponses } from '../../services/localStorageService';
 import { cacheService } from '../../services/cacheService';
 import { ThumbsUp, ThumbsDown, Smile, Meh, Frown, Camera } from 'lucide-react';
 import SignaturePad from '../common/SignaturePad';
@@ -239,11 +239,14 @@ const InspectionScreen: React.FC = () => {
       const analysisStatus = requiresAnalysis ? 'pending' : null;
       const analysisTotalSteps = template?.analysis_approvals_count || 1;
 
+      // Strip offline Base64 images before sending to Supabase (online path)
+      const cleanedAnswers = purgeBase64FromResponses(answers);
+
       const inspectionData = {
         checklist_template_id: templateId,
         vehicle_id: vehicleId,
         inspector_id: userId,
-        responses: answers,
+        responses: cleanedAnswers,
         status: inspectionStatus,
         // Analysis workflow fields
         analysis_status: analysisStatus,
@@ -297,11 +300,14 @@ const InspectionScreen: React.FC = () => {
         const cachedVehicles = cacheService.getVehicles();
         const vehicle = cachedVehicles.find(v => v.id === vehicleId);
 
+        // Strip Base64 before persisting offline — images are sacrificed to preserve storage
+        const offlineResponses = purgeBase64FromResponses(answers);
+
         localStorageService.savePendingInspection({
           checklist_template_id: templateId,
           vehicle_id: vehicleId,
           inspector_id: userId,
-          responses: answers,
+          responses: offlineResponses,
           status: inspectionStatus,
           // Analysis workflow fields (for when synced later)
           analysis_status: analysisStatus,

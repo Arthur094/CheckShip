@@ -23,10 +23,10 @@ const VehicleTypeChecklists: React.FC<VehicleTypeChecklistsProps> = ({ vehicleTy
         try {
             setLoading(true);
 
-            // 1. Fetch all checklist templates
+            // 1. Fetch all published checklist templates (with group_id)
             const { data: templatesData, error: templatesError } = await supabase
                 .from('checklist_templates')
-                .select('id, name')
+                .select('id, name, group_id')
                 .eq('status', 'published')
                 .order('name');
 
@@ -40,8 +40,28 @@ const VehicleTypeChecklists: React.FC<VehicleTypeChecklistsProps> = ({ vehicleTy
 
             if (assignmentsError) throw assignmentsError;
 
+            // 3. Resolve assignments by group_id for version compatibility
+            const assignedIds = (assignmentsData || []).map(a => a.checklist_template_id);
+            
+            // Get group_ids of assigned templates (may include archived versions)
+            const { data: assignedTemplates } = await supabase
+                .from('checklist_templates')
+                .select('group_id')
+                .in('id', assignedIds.length > 0 ? assignedIds : ['__none__']);
+
+            const assignedGroupIds = new Set(
+                (assignedTemplates || []).map((t: any) => t.group_id).filter(Boolean)
+            );
+
+            // Match published templates whose group_id is in the assigned set
+            const resolvedAssignments = new Set(
+                (templatesData || [])
+                    .filter((t: any) => assignedGroupIds.has(t.group_id) || assignedIds.includes(t.id))
+                    .map((t: any) => t.id)
+            );
+
             setTemplates(templatesData || []);
-            setAssignments(new Set((assignmentsData || []).map(a => a.checklist_template_id)));
+            setAssignments(resolvedAssignments);
         } catch (error: any) {
             console.error('Error fetching checklists/assignments:', error.message);
         } finally {

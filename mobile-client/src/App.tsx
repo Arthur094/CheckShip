@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { cacheService } from './services/cacheService';
+import { localStorageService } from './services/localStorageService';
 import LoginScreen from './components/screens/LoginScreen';
 import DashboardScreen from './components/screens/DashboardScreen';
 import VehicleSelectScreen from './components/screens/VehicleSelectScreen';
@@ -59,6 +60,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // One-time migration: purge any accumulated Base64 blobs from localStorage.
+    // Runs silently on every cold start — no-op if nothing to clean.
+    localStorageService.purgeAllBase64();
+
     // Try to get session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (session) {
