@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Truck, Calendar, Download, RefreshCw, AlertCircle, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 interface FleetRow {
   vehicle_id: string;
@@ -45,19 +46,34 @@ const FleetWearReport: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(data.map((r, i) => ({
-      '#': i + 1,
-      'Placa': r.vehicle_plate,
-      'Modelo': r.vehicle_model || '-',
-      'Total Inspeções': r.total_inspections,
-      'Score Médio': r.avg_score ?? '-',
-      'Rejeitados': r.rejected_count,
-    })));
-    ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Frota');
-    XLSX.writeFile(wb, `desgaste_frota_${startDate}_${endDate}.xlsx`);
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Frota');
+
+    ws.columns = [
+      { header: '#', key: 'id', width: 5 },
+      { header: 'Placa', key: 'plate', width: 12 },
+      { header: 'Modelo', key: 'model', width: 20 },
+      { header: 'Total Inspeções', key: 'inspections', width: 15 },
+      { header: 'Score Médio', key: 'score', width: 12 },
+      { header: 'Rejeitados', key: 'rejected', width: 12 },
+    ];
+
+    data.forEach((r, i) => {
+      ws.addRow({
+        id: i + 1,
+        plate: r.vehicle_plate,
+        model: r.vehicle_model || '-',
+        inspections: r.total_inspections,
+        score: r.avg_score ?? '-',
+        rejected: r.rejected_count,
+      });
+    });
+
+    ws.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `desgaste_frota_${startDate}_${endDate}.xlsx`);
   };
 
   const getScoreColor = (score: number | null) => {

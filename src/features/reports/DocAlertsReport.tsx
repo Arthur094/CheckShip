@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { FileWarning, Download, RefreshCw, AlertCircle, AlertTriangle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 interface DocRow {
   doc_id: string;
@@ -38,20 +39,36 @@ const DocAlertsReport: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(data.map((r, i) => ({
-      '#': i + 1,
-      'Tipo': r.entity_type,
-      'Nome/Placa': r.entity_name,
-      'Documento': r.document_type,
-      'Vencimento': formatDate(r.expiry_date),
-      'Dias Restantes': r.days_remaining,
-      'Status': r.doc_status,
-    })));
-    ws['!cols'] = [{ wch: 5 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 12 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Alertas');
-    XLSX.writeFile(wb, `alertas_documentos_${daysAhead}dias.xlsx`);
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Alertas');
+
+    ws.columns = [
+      { header: '#', key: 'id', width: 5 },
+      { header: 'Tipo', key: 'type', width: 10 },
+      { header: 'Nome/Placa', key: 'name', width: 20 },
+      { header: 'Documento', key: 'doc', width: 15 },
+      { header: 'Vencimento', key: 'expiry', width: 12 },
+      { header: 'Dias Restantes', key: 'days', width: 15 },
+      { header: 'Status', key: 'status', width: 12 },
+    ];
+
+    data.forEach((r, i) => {
+      ws.addRow({
+        id: i + 1,
+        type: r.entity_type,
+        name: r.entity_name,
+        doc: r.document_type,
+        expiry: formatDate(r.expiry_date),
+        days: r.days_remaining,
+        status: r.doc_status,
+      });
+    });
+
+    ws.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `alertas_documentos_${daysAhead}dias.xlsx`);
   };
 
   const formatDate = (d: string) => {

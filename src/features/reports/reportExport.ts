@@ -1,24 +1,24 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import type { ComplianceRow } from './useRoutineCompliance';
 
-export function exportComplianceToExcel(rows: ComplianceRow[], filename: string = 'conformidade_rotina'): void {
-  const worksheetData = rows.map((row, index) => ({
-    '#': index + 1,
-    'Motorista': row.driver_name,
-    'Ocorrências': row.occurrences,
-  }));
+export async function exportComplianceToExcel(rows: ComplianceRow[], filename: string = 'conformidade_rotina'): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Conformidade');
 
-  const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-
-  // Column widths
-  worksheet['!cols'] = [
-    { wch: 5 },
-    { wch: 30 },
-    { wch: 15 },
+  worksheet.columns = [
+    { header: '#', key: 'id', width: 5 },
+    { header: 'Motorista', key: 'driver_name', width: 30 },
+    { header: 'Ocorrências', key: 'occurrences', width: 15 },
   ];
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Conformidade');
+  rows.forEach((row, index) => {
+    worksheet.addRow({ id: index + 1, driver_name: row.driver_name, occurrences: row.occurrences });
+  });
 
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+  // Style header row
+  worksheet.getRow(1).font = { bold: true };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${filename}.xlsx`);
 }

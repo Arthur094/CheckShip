@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Users, Calendar, Download, RefreshCw, AlertCircle, BarChart3, Trophy } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 interface DriverRow {
   driver_id: string;
@@ -45,19 +46,34 @@ const DriverPerformanceReport: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(data.map((r, i) => ({
-      '#': i + 1,
-      'Motorista': r.driver_name,
-      'Total Inspeções': r.total_inspections,
-      'Score Médio': r.avg_score ?? '-',
-      'Completados': r.completed_count,
-      'Rejeitados': r.rejected_count,
-    })));
-    ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Desempenho');
-    XLSX.writeFile(wb, `desempenho_motoristas_${startDate}_${endDate}.xlsx`);
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Desempenho');
+
+    ws.columns = [
+      { header: '#', key: 'id', width: 5 },
+      { header: 'Motorista', key: 'name', width: 30 },
+      { header: 'Total Inspeções', key: 'inspections', width: 15 },
+      { header: 'Score Médio', key: 'score', width: 12 },
+      { header: 'Completados', key: 'completed', width: 12 },
+      { header: 'Rejeitados', key: 'rejected', width: 12 },
+    ];
+
+    data.forEach((r, i) => {
+      ws.addRow({
+        id: i + 1,
+        name: r.driver_name,
+        inspections: r.total_inspections,
+        score: r.avg_score ?? '-',
+        completed: r.completed_count,
+        rejected: r.rejected_count,
+      });
+    });
+
+    ws.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `desempenho_motoristas_${startDate}_${endDate}.xlsx`);
   };
 
   const getScoreColor = (score: number | null) => {

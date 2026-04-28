@@ -8,8 +8,8 @@ Este documento registra as vulnerabilidades identificadas e o status das remedia
 - **Severidade:** ALTA
 - **Tipo:** Cross-Site Scripting (XSS)
 - **Risco:** Um atacante pode injetar scripts maliciosos em PDFs gerados pelo sistema. Se o PDF for aberto por um administrador em um contexto inseguro, o script pode roubar cookies de sessão.
-- **Status:** Pendente. Requer atualização para `0.14.0`.
-- **Impacto da Correção:** Alteração em Breaking Change no método de exportação.
+- **Status:** ✅ Resolvido (27/04/2026). Atualizado para `^0.14.0`.
+- **Impacto da Correção:** Nenhum breaking change observado no build.
 
 ### xlsx (SheetJS - Todas as versões)
 - **Severidade:** ALTA
@@ -17,8 +17,8 @@ Este documento registra as vulnerabilidades identificadas e o status das remedia
 - **Risco:**
     - **Prototype Pollution:** Pode permitir que um atacante modifique o comportamento global de objetos JavaScript no sistema, levando a bypass de autenticação ou execução de código.
     - **ReDoS:** Planilhas maliciosas podem travar o servidor ou o navegador do usuário ao serem processadas.
-- **Status:** Crítico. Não há correção automática via npm.
-- **Plano de Ação:** Avaliar migração para `exceljs` ou implementar sanitização rigorosa no upload.
+- **Status:** ✅ Resolvido (27/04/2026). Biblioteca `xlsx` removida e substituída por `exceljs ^4.4.0` + `file-saver ^2.0.5`.
+- **Arquivos migrados:** `reportExport.ts`, `FleetWearReport.tsx`, `DriverPerformanceReport.tsx`, `DocAlertsReport.tsx`.
 
 ## 2. Guia de Remediação Concluído (Abril 2026)
 
@@ -34,7 +34,7 @@ Este incidente foi mitigado seguindo o protocolo de "Zero Downtime" para infraes
 ## 3. Recomendações de Manutenção (Próximos Passos)
 - [ ] **Reset de Senhas:** Recomenda-se realizar o reset de senhas/sessões dos motoristas em uma janela de manutenção programada.
 - [ ] **Separação de Ambientes:** Implementar um projeto separado no Supabase para desenvolvimento local para evitar conexão direta com a Produção.
-- [ ] **Correção de Dependências:** Testar a atualização do `html2pdf.js` para `0.14.0`.
+- [x] **Correção de Dependências:** `html2pdf.js` atualizado para `^0.14.0`, `xlsx` removido e substituído por `exceljs`.
 
 ## 4. Diretrizes de Segurança para Desenvolvedores
 - Nunca prefixar chaves administrativas com `VITE_`.
